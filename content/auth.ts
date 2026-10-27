@@ -8,47 +8,13 @@ export const AUTH_COPY = {
   signInPath: "/login",
   signUpPath: "/login?mode=signup",
 
-  /** The card on /login. */
-  card: {
-    loginTitle: "Log in",
-    signupTitle: "Create your account",
-    loginLead: "Enter your email and we send you a code.",
-    signupLead: "Your email gets a verification code. Then we set up your account.",
-    email: "Email",
-    emailPlaceholder: "you@email.com",
-    continue: "Continue",
-    productUpdates: "Send me product updates",
-    or: "or",
-    walletMetamask: "Continue with MetaMask",
-    walletCoinbase: "Continue with Coinbase Wallet",
-    walletEmailLead: "Your wallet is verified. Add the email for your account.",
-    noAccount: "No account for this email yet.",
-    noAccountSwitch: "Sign up instead",
-    noWalletAccount: "No account for this wallet yet.",
-    noWalletAccountSwitch: "Sign up with this wallet",
-    haveAccount: "There is already an account with this email.",
-    haveAccountSwitch: "Log in instead",
-    walletTaken: "This wallet already belongs to an account.",
-    walletEmailTaken:
-      "That email already belongs to an account. Log in with it and add this wallet under Account.",
-    secondFactor:
-      "This account needs a second sign-in step that Studio does not support yet. Finish signing in on canhav.com.",
-    missingFields: (fields: string) =>
-      `Sign-up needs more fields than Studio collects here (${fields}). Check the Clerk settings.`,
-    abandoned: "That sign-up timed out. Start again.",
-    finishing: "Signing you in…",
-  },
-
-  /** The verification code step. */
-  code: {
-    title: "Check your email",
-    lead: (email: string) => `We sent a 6-digit code to ${email}.`,
-    label: "Code",
-    verify: "Verify",
-    resend: "Send a new code",
-    resendIn: (s: number) => `Send a new code in ${s}s`,
-    changeEmail: "Use a different email",
-  },
+  /** The sign-up page heading, as on canhav.com. */
+  signUpKicker: "Accounts",
+  signUpTitle: "Create your account",
+  signUpLead:
+    "Sign up with your email, Google or your wallet to open the studio, design a project or a token, and publish it for anyone to verify.",
+  noAccount: "No account yet?",
+  haveAccount: "Already have an account?",
 
   /** The three sign-up steps on /welcome. */
   welcome: {
@@ -62,6 +28,7 @@ export const AUTH_COPY = {
       handle: "Public handle",
       handleHint: "3 or more characters: letters, numbers and underscores.",
       handleTaken: "That handle is taken.",
+      productUpdates: "Send me product updates",
       continue: "Continue",
     },
     avatar: {

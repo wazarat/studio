@@ -19,14 +19,16 @@ been approved move over; canhav.dev stays as the reference copy.
 
 Clerk, shared with canhav.dev, with a sign-up flow of our own:
 
-- `/login` — log in or sign up with an email and a verification code, or a
-  wallet (MetaMask, Coinbase Wallet). A wallet sign-up still adds and verifies
-  an email. "Send me product updates" is an unticked checkbox on sign-up.
+- `/login` — Clerk's prebuilt sign-in and sign-up cards, as on canhav.com:
+  email with a verification code, Google, or a wallet (MetaMask, Base). A
+  wallet sign-up is asked for its email because the instance requires one.
+  `?mode=signup` shows the sign-up card.
 - `/welcome` — the steps after the email: your name and public handle
-  (required, the handle is the byline on public project pages), an avatar
-  (optional, with Skip), and how you build (role, experience, AI IDE;
-  optional). Saved on the Clerk user: name, username and image on the user
-  itself, the rest under `unsafeMetadata.studio`.
+  (required, the handle is the byline on public project pages) with the
+  unticked "Send me product updates" checkbox, an avatar (optional, with
+  Skip), and how you build (role, experience, AI IDE; optional). Saved on the
+  Clerk user: name, username and image on the user itself, the rest under
+  `unsafeMetadata.studio`.
 - `/studio` — the signed-in home, for now the heading and subtitle, with a
   small popup after the last step.
 - The avatar at the top right opens Account (Clerk's profile) and Sign out.
@@ -43,7 +45,8 @@ User & authentication:
 - First and last name on, not required at sign-up. Username on, not required,
   minimum length 3.
 - Password off (or optional); phone off.
-- Web3: MetaMask and Coinbase Wallet on.
+- SSO connections: Google on (Clerk's shared development credentials are fine).
+- Web3: MetaMask and Base on.
 - Client Trust off; sign-up mode public; organizations not required.
 
 A field marked "required at sign-up" would leave the sign-up waiting for it

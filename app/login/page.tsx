@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { AuthCard, type AuthMode } from "@/components/auth/AuthCard";
+import { SignInCard } from "@/components/auth/SignInCard";
+import { SignUpCard } from "@/components/auth/SignUpCard";
 import { Card, CardSection } from "@/components/ui/Card";
 import { AUTH_COPY } from "@/content/auth";
 import { STUDIO_COPY } from "@/content/studio";
@@ -13,9 +14,10 @@ export const metadata: Metadata = { title: AUTH_COPY.logIn };
 export const dynamic = "force-dynamic";
 
 /**
- * Log in and sign up. On canhav.dev this was the signed-out view of /studio
- * with Clerk's prebuilt card; here the card is ours. A signed-in visitor is
- * sent on to the studio (or the page they were heading for).
+ * Log in (the default) and sign up (?mode=signup), with Clerk's prebuilt
+ * cards as on canhav.com. Log in sits under the Studio heading the way the
+ * signed-out studio did; sign up gets its own heading. A signed-in visitor
+ * is sent on to the studio, or the page they were heading for.
  */
 export default async function LoginPage({
   searchParams,
@@ -32,17 +34,29 @@ export default async function LoginPage({
     redirect(safeRedirectPath(redirect_url, `${proto}://${host}`) ?? STUDIO_PATH);
   }
 
-  const initialMode: AuthMode = mode === "signup" ? "signup" : "login";
+  const signup = mode === "signup";
 
   return (
     <div className="container py-14 md:py-20">
       <div className="max-w-2xl">
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink-50 md:text-5xl">
-          {STUDIO_COPY.kicker}
-        </h1>
-        <p className="mt-4 text-lg leading-relaxed text-ink-300">{STUDIO_COPY.subtitle}</p>
+        {signup ? (
+          <>
+            <p className="kicker">{AUTH_COPY.signUpKicker}</p>
+            <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-ink-50 md:text-5xl">
+              {AUTH_COPY.signUpTitle}
+            </h1>
+            <p className="mt-4 text-sm leading-relaxed text-ink-400">{AUTH_COPY.signUpLead}</p>
+          </>
+        ) : (
+          <>
+            <h1 className="font-display text-4xl font-semibold tracking-tight text-ink-50 md:text-5xl">
+              {STUDIO_COPY.kicker}
+            </h1>
+            <p className="mt-4 text-lg leading-relaxed text-ink-300">{STUDIO_COPY.subtitle}</p>
+          </>
+        )}
       </div>
-      <div className="mt-10">
+      <div className="mt-10 md:mt-12">
         {gate === "unconfigured" ? (
           <Card className="max-w-md">
             <CardSection>
@@ -55,8 +69,10 @@ export default async function LoginPage({
               </p>
             </CardSection>
           </Card>
+        ) : signup ? (
+          <SignUpCard />
         ) : (
-          <AuthCard initialMode={initialMode} redirectUrl={redirect_url ?? null} />
+          <SignInCard />
         )}
       </div>
     </div>

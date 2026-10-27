@@ -1,38 +1,13 @@
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 
-/** Plain-language copy for the Clerk error codes the auth screens can hit. */
+/** Plain-language copy for the Clerk error codes the onboarding steps can hit. */
 const COPY: Record<string, string> = {
-  form_identifier_not_found: "No account for this email yet.",
-  form_identifier_exists: "There is already an account with this email.",
-  form_code_incorrect: "That code is not right. Check the email and try again.",
-  verification_expired: "That code has expired. Send a new one.",
-  verification_failed: "That code could not be verified. Send a new one.",
-  form_param_format_invalid: "Please enter a valid email address.",
+  form_identifier_exists: "That is already taken.",
+  form_param_format_invalid: "That value is not in the right format.",
   form_username_invalid_length: "Use between 3 and 32 characters.",
   form_username_invalid_character: "Letters, numbers and underscores only.",
-  form_password_pwned: "That password has appeared in a data breach.",
-  session_exists: "You are already signed in.",
   too_many_requests: "Too many attempts. Wait a moment and try again.",
-  web3_wallet_not_found: "No wallet extension was found in this browser.",
 };
-
-interface FieldErrorLike {
-  code: string;
-  message: string;
-  longMessage?: string;
-}
-
-/** Our copy for a known code, else Clerk's user-facing message. */
-export function fieldMessage(err: FieldErrorLike | null | undefined): string | null {
-  if (!err) return null;
-  return COPY[err.code] ?? err.longMessage ?? err.message;
-}
-
-/** The first global (non-field) error as a sentence, or null. */
-export function globalMessage(errors: { global: ReadonlyArray<FieldErrorLike> | null } | null | undefined): string | null {
-  const first = errors?.global?.[0];
-  return first ? fieldMessage(first) : null;
-}
 
 export interface ApiErrorInfo {
   code: string;
@@ -55,19 +30,6 @@ export function apiErrorInfo(err: unknown): ApiErrorInfo | null {
     param: meta.paramName ?? null,
     message: COPY[first.code] ?? first.longMessage ?? first.message,
   };
-}
-
-/**
- * The machine code of an error returned by a sign-in or sign-up method. The
- * future methods return a ClerkError, which may be the API response wrapper
- * whose own code is generic while the real code sits on its first entry.
- */
-export function errorCode(err: unknown): string | null {
-  if (!err || typeof err !== "object") return null;
-  const e = err as { code?: string; errors?: Array<{ code?: string }> };
-  const inner = e.errors?.[0]?.code;
-  if (inner) return inner;
-  return e.code ?? null;
 }
 
 /** A sentence for any thrown error, Clerk or not. */

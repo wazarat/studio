@@ -8,13 +8,22 @@ import { Field, Input } from "@/components/ui/Input";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
 import { apiErrorInfo, errorSentence } from "@/lib/clerk-errors";
-import { HANDLE_MAX, NAME_MAX, normalizeHandle, validateHandle, validateName } from "@/lib/onboarding";
+import {
+  HANDLE_MAX,
+  NAME_MAX,
+  STUDIO_META_KEY,
+  normalizeHandle,
+  readStudioMeta,
+  validateHandle,
+  validateName,
+} from "@/lib/onboarding";
 
 export function NameStep({ user, onDone }: { user: ClerkUser; onDone: () => void }) {
   const N = AUTH_COPY.welcome.name;
   const [first, setFirst] = useState(user.firstName ?? "");
   const [last, setLast] = useState(user.lastName ?? "");
   const [handle, setHandle] = useState(user.username ?? "");
+  const [productUpdates, setProductUpdates] = useState(readStudioMeta(user.unsafeMetadata).productUpdates ?? false);
   const [errors, setErrors] = useState<{ first?: string; last?: string; handle?: string; global?: string }>({});
   const [saving, setSaving] = useState(false);
 
@@ -30,6 +39,7 @@ export function NameStep({ user, onDone }: { user: ClerkUser; onDone: () => void
     setSaving(true);
     try {
       await user.update({ firstName: first.trim(), lastName: last.trim(), username: normalizeHandle(handle) });
+      await user.updateMetadata({ unsafeMetadata: { [STUDIO_META_KEY]: { productUpdates } } });
       onDone();
     } catch (err) {
       const info = apiErrorInfo(err);
@@ -69,6 +79,15 @@ export function NameStep({ user, onDone }: { user: ClerkUser; onDone: () => void
           placeholder="ada_lovelace"
         />
       </Field>
+      <label className="flex items-center gap-2 text-sm text-ink-200">
+        <input
+          type="checkbox"
+          checked={productUpdates}
+          onChange={(e) => setProductUpdates(e.target.checked)}
+          className="h-4 w-4 rounded border-ink-600 bg-ink-950 accent-electric-500"
+        />
+        {N.productUpdates}
+      </label>
       {errors.global ? (
         <StatusChip tone="error" variant="block" role="alert">
           {errors.global}
