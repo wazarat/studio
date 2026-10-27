@@ -7,6 +7,8 @@ export const SITE = {
   tagline: "DeFi ecosystem solutions for capital markets.",
   url: "https://canhav.com",
   docsUrl: "https://docs.canhav.com",
+  /** The booking page (Google Calendar on a canhav address). */
+  meetUrl: "https://meet.canhav.com",
   description:
     "CanHav Research builds DeFi ecosystem solutions. Token design, testnet deployment, MCP data connectors, and market validation for teams and independent builders.",
   footerBlurb:
@@ -23,5 +25,6 @@ export const SITE = {
  * reached from the studio, not from here.
  */
 export const NAV_LINKS: ReadonlyArray<{ label: string; href: string; soon?: boolean }> = [
+  { label: "Meet", href: SITE.meetUrl },
   { label: "Docs", href: SITE.docsUrl },
 ];
