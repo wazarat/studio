@@ -57,6 +57,19 @@ export function apiErrorInfo(err: unknown): ApiErrorInfo | null {
   };
 }
 
+/**
+ * The machine code of an error returned by a sign-in or sign-up method. The
+ * future methods return a ClerkError, which may be the API response wrapper
+ * whose own code is generic while the real code sits on its first entry.
+ */
+export function errorCode(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const e = err as { code?: string; errors?: Array<{ code?: string }> };
+  const inner = e.errors?.[0]?.code;
+  if (inner) return inner;
+  return e.code ?? null;
+}
+
 /** A sentence for any thrown error, Clerk or not. */
 export function errorSentence(err: unknown, fallback: string): string {
   const info = apiErrorInfo(err);

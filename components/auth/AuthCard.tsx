@@ -12,7 +12,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
 import { STUDIO_PATH, WELCOME_PATH, safeRedirectPath } from "@/lib/auth-paths";
-import { fieldMessage, globalMessage } from "@/lib/clerk-errors";
+import { errorCode, fieldMessage, globalMessage } from "@/lib/clerk-errors";
 import { STUDIO_META_KEY } from "@/lib/onboarding";
 
 export type AuthMode = "login" | "signup";
@@ -75,7 +75,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
     setLocalError(null);
     const { error } = await signIn.create({ identifier: email.trim() });
     if (error) {
-      if (error.code === "form_identifier_not_found") {
+      if (errorCode(error) === "form_identifier_not_found") {
         setNotice(
           <>
             {C.noAccount}{" "}
@@ -84,7 +84,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
             </button>
           </>,
         );
-      } else if (error.code === "session_exists") {
+      } else if (errorCode(error) === "session_exists") {
         window.location.assign(destination());
       }
       return;
@@ -100,7 +100,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
     setLocalError(null);
     const { error } = await signIn.web3({ provider, strategy: WALLET_STRATEGY[provider] });
     if (error) {
-      if (error.code === "form_identifier_not_found") {
+      if (errorCode(error) === "form_identifier_not_found") {
         setNotice(
           <>
             {C.noWalletAccount}{" "}
@@ -150,7 +150,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
     setLocalError(null);
     const { error } = await signUp.create({ emailAddress: email.trim(), unsafeMetadata: metadata });
     if (error) {
-      if (error.code === "form_identifier_exists") setNotice(haveAccountNotice());
+      if (errorCode(error) === "form_identifier_exists") setNotice(haveAccountNotice());
       return;
     }
     const sent = await signUp.verifications.sendEmailCode();
@@ -165,7 +165,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
     setLocalError(null);
     const { error } = await signUp.web3({ strategy: WALLET_STRATEGY[provider], unsafeMetadata: metadata });
     if (error) {
-      if (error.code === "form_identifier_exists") {
+      if (errorCode(error) === "form_identifier_exists") {
         setNotice(
           <>
             {C.walletTaken}{" "}
@@ -200,7 +200,7 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
     setLocalError(null);
     const { error } = await signUp.update({ emailAddress: email.trim() });
     if (error) {
-      if (error.code === "form_identifier_exists") setNotice(C.walletEmailTaken);
+      if (errorCode(error) === "form_identifier_exists") setNotice(C.walletEmailTaken);
       return;
     }
     const sent = await signUp.verifications.sendEmailCode();
@@ -258,11 +258,14 @@ export function AuthCard({ initialMode, redirectUrl }: { initialMode: AuthMode; 
   if (phase === "task") return <RedirectToTasks />;
 
   const errs = mode === "login" ? signInErrors : signUpErrors;
+  // A notice with a link already says what the field error would say.
   const emailError =
     localError ??
-    (mode === "login"
-      ? fieldMessage(signInErrors.fields.identifier)
-      : fieldMessage(signUpErrors.fields.emailAddress));
+    (notice
+      ? null
+      : mode === "login"
+        ? fieldMessage(signInErrors.fields.identifier)
+        : fieldMessage(signUpErrors.fields.emailAddress));
   const codeError = fieldMessage(errs.fields.code);
   const captchaError = mode === "signup" ? fieldMessage(signUpErrors.fields.captcha) : null;
   const globalError = globalMessage(errs);
