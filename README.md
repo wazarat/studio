@@ -28,7 +28,7 @@ Clerk, shared with canhav.dev, with a sign-up flow of our own:
   your name and username (required, the username is the byline on public
   project pages) with the unticked "Send me product updates" checkbox, an
   avatar (optional; a Google picture shows and can be removed), and how you
-  build (role, experience, AI IDE dropdowns; optional). Saved on the Clerk
+  build (role, experience, AI IDE; optional). Saved on the Clerk
   user: name, username and image on the user itself, the rest under
   `unsafeMetadata.studio`. A small popup follows the last step.
 - The avatar at the top right opens Account (Clerk's profile) and Sign out.

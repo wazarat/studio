@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { StepFooter } from "@/components/onboarding/StepFooter";
 import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
@@ -124,14 +125,13 @@ export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: 
           {error}
         </StatusChip>
       ) : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" disabled={saving} onClick={() => void next()}>
-          {saving ? AUTH_COPY.welcome.saving : A.next}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onBack}>
-          {A.back}
-        </Button>
-      </div>
+      <StepFooter
+        primary={saving ? AUTH_COPY.welcome.saving : A.next}
+        onPrimary={() => void next()}
+        onBack={onBack}
+        onSkip={onDone}
+        busy={saving}
+      />
     </div>
   );
 }

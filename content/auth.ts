@@ -18,9 +18,7 @@ export const AUTH_COPY = {
 
   /** The three sign-up steps in the pop-up over /studio. */
   welcome: {
-    title: "Set up your account",
-    lead: "Three short steps. The first is the only one we need.",
-    steps: { name: "Your name", avatar: "Avatar", build: "How you build" },
+    steps: { name: "What should we call you", avatar: "Add a picture", build: "How do you build" },
     name: {
       lead: "Your name is shown to your team. Your username is the byline on your public project pages.",
       first: "First name",
@@ -41,8 +39,7 @@ export const AUTH_COPY = {
       badType: "Use a PNG, JPEG, WebP or GIF.",
     },
     build: {
-      lead: "Optional. Three quick picks so the studio can show the setup for your tools.",
-      placeholder: "Choose…",
+      lead: "Optional. Three quick taps so the studio can show the setup for your tools.",
       role: "Your role",
       roleOther: "Tell us more",
       roleOtherPlaceholder: "What do you do?",

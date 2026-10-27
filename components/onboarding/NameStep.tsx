@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ClerkUser } from "@/lib/clerk-types";
 
-import { Button } from "@/components/ui/Button";
+import { StepFooter } from "@/components/onboarding/StepFooter";
 import { Field, Input } from "@/components/ui/Input";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
@@ -93,9 +93,7 @@ export function NameStep({ user, onDone }: { user: ClerkUser; onDone: () => void
           {errors.global}
         </StatusChip>
       ) : null}
-      <Button type="submit" disabled={saving}>
-        {saving ? AUTH_COPY.welcome.saving : N.continue}
-      </Button>
+      <StepFooter primary={saving ? AUTH_COPY.welcome.saving : N.continue} primaryType="submit" busy={saving} />
     </form>
   );
 }

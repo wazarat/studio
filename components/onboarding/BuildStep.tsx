@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/Button";
+import { StepFooter } from "@/components/onboarding/StepFooter";
+import { ChipRadioGroup } from "@/components/ui/ChipGroup";
 import { Field, Input } from "@/components/ui/Input";
-import { SelectField } from "@/components/ui/Select";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
 import { errorSentence } from "@/lib/clerk-errors";
@@ -21,7 +21,17 @@ import {
   type Role,
 } from "@/lib/onboarding";
 
-export function BuildStep({ user, onDone, onBack }: { user: ClerkUser; onDone: () => void; onBack: () => void }) {
+export function BuildStep({
+  user,
+  onDone,
+  onBack,
+  onSkip,
+}: {
+  user: ClerkUser;
+  onDone: () => void;
+  onBack: () => void;
+  onSkip: () => void;
+}) {
   const B = AUTH_COPY.welcome.build;
   const saved = readStudioMeta(user.unsafeMetadata);
   const [role, setRole] = useState<Role | "">(saved.role ?? "");
@@ -54,9 +64,9 @@ export function BuildStep({ user, onDone, onBack }: { user: ClerkUser; onDone: (
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <p className="text-sm leading-relaxed text-ink-300">{B.lead}</p>
-      <SelectField label={B.role} value={role} onChange={setRole} options={ROLE_OPTIONS} clearable placeholder={B.placeholder} />
+      <ChipRadioGroup label={B.role} value={role} onChange={setRole} options={ROLE_OPTIONS} />
       {role === "other" ? (
         <Field label={B.roleOther}>
           <Input
@@ -67,36 +77,20 @@ export function BuildStep({ user, onDone, onBack }: { user: ClerkUser; onDone: (
           />
         </Field>
       ) : null}
-      <SelectField
-        label={B.experience}
-        value={experience}
-        onChange={setExperience}
-        options={EXPERIENCE_OPTIONS}
-        clearable
-        placeholder={B.placeholder}
-      />
-      <SelectField
-        label={B.ide}
-        hint={B.ideHint}
-        value={ide}
-        onChange={setIde}
-        options={IDE_OPTIONS}
-        clearable
-        placeholder={B.placeholder}
-      />
+      <ChipRadioGroup label={B.experience} value={experience} onChange={setExperience} options={EXPERIENCE_OPTIONS} />
+      <ChipRadioGroup label={B.ide} hint={B.ideHint} value={ide} onChange={setIde} options={IDE_OPTIONS} />
       {error ? (
         <StatusChip tone="error" variant="block" role="alert">
           {error}
         </StatusChip>
       ) : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" disabled={saving} onClick={() => void finish()}>
-          {saving ? AUTH_COPY.welcome.saving : B.finish}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onBack}>
-          {B.back}
-        </Button>
-      </div>
+      <StepFooter
+        primary={saving ? AUTH_COPY.welcome.saving : B.finish}
+        onPrimary={() => void finish()}
+        onBack={onBack}
+        onSkip={onSkip}
+        busy={saving}
+      />
     </div>
   );
 }
