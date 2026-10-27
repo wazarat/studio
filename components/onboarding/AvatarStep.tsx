@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Avatar, initialsOf } from "@/components/layout/Avatar";
 import { StepFooter } from "@/components/onboarding/StepFooter";
 import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -89,16 +90,7 @@ export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: 
     <div className="space-y-4">
       <p className="text-sm leading-relaxed text-ink-300">{A.lead}</p>
       <div className="flex items-center gap-4">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-ink-700/60 bg-ink-950/50">
-          {shown ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="font-display text-2xl font-semibold text-ink-500">
-              {(user.firstName?.[0] ?? "").toUpperCase()}
-            </span>
-          )}
-        </div>
+        <Avatar src={shown} initials={initialsOf(user)} size="lg" />
         <div className="space-y-2">
           <input
             ref={inputRef}

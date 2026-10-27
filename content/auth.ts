@@ -1,10 +1,11 @@
 /** Copy for the sign up and log in surfaces (nav, hero, /login, the studio pop-up, the account menu). */
 export const AUTH_COPY = {
   logIn: "Log in",
+  signIn: "Sign in",
   signUp: "Sign up",
   logInOrSignUp: "Log in or sign up",
   openStudio: "Open Studio",
-  studio: "Studio",
+  switchAccount: "Switch account",
   signInPath: "/login",
   signUpPath: "/login?mode=signup",
 

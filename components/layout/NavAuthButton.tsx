@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 
-import { AccountMenu } from "@/components/layout/AccountMenu";
 import { Button } from "@/components/ui/Button";
 import { AUTH_COPY } from "@/content/auth";
 import { isAuthConfiguredClient } from "@/lib/auth-client";
@@ -12,25 +11,19 @@ import { STUDIO_PATH } from "@/lib/auth-paths";
 function LogInButton() {
   return (
     <Button asChild size="sm">
-      <Link href={AUTH_COPY.signInPath}>{AUTH_COPY.logIn}</Link>
+      <Link href={AUTH_COPY.signInPath}>{AUTH_COPY.signIn}</Link>
     </Button>
   );
 }
 
-/** Signed in: a Studio link and the avatar menu. Signed out, or while Clerk loads: the Log in button. */
+/** The marketing header's one filled button: Sign in, or Open Studio once signed in. */
 function AuthAware() {
   const { isLoaded, isSignedIn } = useUser();
   if (!isLoaded || !isSignedIn) return <LogInButton />;
   return (
-    <>
-      <Link
-        href={STUDIO_PATH}
-        className="whitespace-nowrap text-sm font-medium text-ink-300 transition-colors hover:text-ink-50"
-      >
-        {AUTH_COPY.studio}
-      </Link>
-      <AccountMenu />
-    </>
+    <Button asChild size="sm">
+      <Link href={STUDIO_PATH}>{AUTH_COPY.openStudio}</Link>
+    </Button>
   );
 }
 

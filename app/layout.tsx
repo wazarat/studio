@@ -3,9 +3,6 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
 import { AppClerkProvider } from "@/components/layout/AppClerkProvider";
-import { Background } from "@/components/layout/Background";
-import { Footer } from "@/components/layout/Footer";
-import { Nav } from "@/components/layout/Nav";
 import { THEME_COLOR } from "@/lib/theme-constants";
 import { SITE } from "@/content/site";
 
@@ -67,25 +64,22 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: THEME_COLOR.dark,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
+  ],
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Dark only for now. The light palette is still defined in globals.css
-    // (html.light) for a later step; nothing switches to it yet.
-    <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable} dark`}>
+    // Dark is the server class on every route so marketing stays static; the
+    // app shell swaps it before paint when a light choice is stored, hence the
+    // hydration warning suppression on this one element.
+    <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable} dark`} suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <AppClerkProvider>
-          <Background />
-          <div className="relative flex min-h-screen flex-col">
-            <Nav />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-        </AppClerkProvider>
+        <AppClerkProvider>{children}</AppClerkProvider>
         <Analytics />
       </body>
     </html>

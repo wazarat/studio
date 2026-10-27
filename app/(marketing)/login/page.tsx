@@ -10,7 +10,7 @@ import { STUDIO_COPY } from "@/content/studio";
 import { getOnboardingGate } from "@/lib/auth";
 import { STUDIO_PATH, safeRedirectPath } from "@/lib/auth-paths";
 
-export const metadata: Metadata = { title: AUTH_COPY.logIn };
+export const metadata: Metadata = { title: AUTH_COPY.signIn };
 export const dynamic = "force-dynamic";
 
 /**

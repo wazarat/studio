@@ -20,7 +20,7 @@ export function SignUpCard() {
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <span className="text-sm text-ink-400">{AUTH_COPY.haveAccount}</span>
         <Button asChild variant="outline" size="sm">
-          <Link href={AUTH_COPY.signInPath}>{AUTH_COPY.logIn}</Link>
+          <Link href={AUTH_COPY.signInPath}>{AUTH_COPY.signIn}</Link>
         </Button>
       </div>
     </div>
