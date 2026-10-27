@@ -1,0 +1,8 @@
+# Point Git Sync at the docs/ tree. When connecting GitBook, either:
+# - set Project directory to repo root and use this file, or
+# - set Project directory to docs/ and omit root (defaults apply inside docs/).
+root: ./docs/
+
+structure:
+  readme: general/welcome-to-canhav.md
+  summary: SUMMARY.md
