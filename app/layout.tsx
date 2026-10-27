@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
+import { AppClerkProvider } from "@/components/layout/AppClerkProvider";
 import { Background } from "@/components/layout/Background";
 import { Footer } from "@/components/layout/Footer";
 import { Nav } from "@/components/layout/Nav";
@@ -77,12 +78,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // (html.light) for a later step; nothing switches to it yet.
     <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable} dark`}>
       <body className="min-h-screen antialiased">
-        <Background />
-        <div className="relative flex min-h-screen flex-col">
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
+        <AppClerkProvider>
+          <Background />
+          <div className="relative flex min-h-screen flex-col">
+            <Nav />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </AppClerkProvider>
         <Analytics />
       </body>
     </html>

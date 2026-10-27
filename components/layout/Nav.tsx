@@ -1,15 +1,13 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/Button";
+import { NavAuthButton } from "@/components/layout/NavAuthButton";
 import { Logo } from "@/components/ui/Logo";
 import { SoonBadge } from "@/components/ui/SoonBadge";
-import { AUTH_COPY } from "@/content/auth";
 import { NAV_LINKS } from "@/content/site";
 
 /**
- * The signed-out header from canhav.dev, without the theme toggle, the
- * studio breadcrumb and the Clerk-aware account button: the logo, the
- * Docs link and one "Log in" button to the login page.
+ * The header: the logo, the Docs link, and either "Log in" or, once signed
+ * in, a Studio link and the avatar menu. No theme toggle (dark only for now).
  */
 export function Nav() {
   return (
@@ -31,9 +29,7 @@ export function Nav() {
               </Link>
             ))}
           </nav>
-          <Button asChild size="sm">
-            <Link href={AUTH_COPY.signInPath}>{AUTH_COPY.logIn}</Link>
-          </Button>
+          <NavAuthButton />
         </div>
       </div>
     </header>

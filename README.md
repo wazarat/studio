@@ -15,7 +15,42 @@ been approved move over; canhav.dev stays as the reference copy.
 - `docs/` — the markdown behind docs.canhav.com, carried over unchanged for
   when Studio hosts the docs itself. The app does not read it yet.
 
-Not in this step: Clerk, the Neon database, light mode, the custom domain.
+## Step 2: accounts
+
+Clerk, shared with canhav.dev, with a sign-up flow of our own:
+
+- `/login` — log in or sign up with an email and a verification code, or a
+  wallet (MetaMask, Coinbase Wallet). A wallet sign-up still adds and verifies
+  an email. "Send me product updates" is an unticked checkbox on sign-up.
+- `/welcome` — the steps after the email: your name and public handle
+  (required, the handle is the byline on public project pages), an avatar
+  (optional, with Skip), and how you build (role, experience, AI IDE;
+  optional). Saved on the Clerk user: name, username and image on the user
+  itself, the rest under `unsafeMetadata.studio`.
+- `/studio` — the signed-in home, for now the heading and subtitle, with a
+  small popup after the last step.
+- The avatar at the top right opens Account (Clerk's profile) and Sign out.
+
+### Clerk setup
+
+Until the canhav.com domain moves to Studio, use the **Development instance**
+keys (`pk_test` / `sk_test`) in `.env.local` and in the Vercel project; the
+production instance is bound to canhav.com. Settings on that instance, under
+User & authentication:
+
+- Email address on and required, verified at sign-up with an email code; email
+  code enabled as a sign-in method.
+- First and last name on, not required at sign-up. Username on, not required,
+  minimum length 3.
+- Password off (or optional); phone off.
+- Web3: MetaMask and Coinbase Wallet on.
+- Client Trust off; sign-up mode public; organizations not required.
+
+A field marked "required at sign-up" would leave the sign-up waiting for it
+after the code and block the session.
+
+Not in this step: the Neon database, light mode, the custom domain, the
+project list and templates on `/studio`.
 
 ## Run
 
