@@ -81,13 +81,13 @@ export function validateName(value: string, what: "First name" | "Last name"): s
   return null;
 }
 
-/** Lowercases and checks a public handle. First problem or null. */
+/** Lowercases and checks a username (the public handle). First problem or null. */
 export function validateHandle(value: string): string | null {
   const v = value.trim().toLowerCase();
-  if (!v) return "A handle is required.";
-  if (v.length < HANDLE_MIN) return `Use at least ${HANDLE_MIN} characters.`;
-  if (v.length > HANDLE_MAX) return `Use at most ${HANDLE_MAX} characters.`;
-  if (!HANDLE_RE.test(v)) return "Letters, numbers and underscores only.";
+  if (!v) return "A username is required.";
+  if (v.length < HANDLE_MIN || v.length > HANDLE_MAX || !HANDLE_RE.test(v)) {
+    return `A username is ${HANDLE_MIN} to ${HANDLE_MAX} characters: letters, numbers and underscores.`;
+  }
   return null;
 }
 

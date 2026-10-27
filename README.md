@@ -23,14 +23,14 @@ Clerk, shared with canhav.dev, with a sign-up flow of our own:
   email with a verification code, Google, or a wallet (MetaMask, Base). A
   wallet sign-up is asked for its email because the instance requires one.
   `?mode=signup` shows the sign-up card.
-- `/welcome` — the steps after the email: your name and public handle
-  (required, the handle is the byline on public project pages) with the
-  unticked "Send me product updates" checkbox, an avatar (optional, with
-  Skip), and how you build (role, experience, AI IDE; optional). Saved on the
-  Clerk user: name, username and image on the user itself, the rest under
-  `unsafeMetadata.studio`.
-- `/studio` — the signed-in home, for now the heading and subtitle, with a
-  small popup after the last step.
+- `/studio` — the signed-in home, for now the heading and subtitle. An
+  account that has not finished signing up gets a pop-up with the steps:
+  your name and username (required, the username is the byline on public
+  project pages) with the unticked "Send me product updates" checkbox, an
+  avatar (optional; a Google picture shows and can be removed), and how you
+  build (role, experience, AI IDE dropdowns; optional). Saved on the Clerk
+  user: name, username and image on the user itself, the rest under
+  `unsafeMetadata.studio`. A small popup follows the last step.
 - The avatar at the top right opens Account (Clerk's profile) and Sign out.
 
 ### Clerk setup

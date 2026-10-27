@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { WelcomeToast } from "@/components/studio/WelcomeToast";
+import { StudioOnboarding } from "@/components/studio/StudioOnboarding";
 import { Card, CardSection } from "@/components/ui/Card";
 import { STUDIO_COPY } from "@/content/studio";
 import { getOnboardingGate } from "@/lib/auth";
-import { STUDIO_PATH, WELCOME_PATH, loginPathFor } from "@/lib/auth-paths";
+import { STUDIO_PATH, loginPathFor } from "@/lib/auth-paths";
 
 export const metadata: Metadata = { title: STUDIO_COPY.kicker, robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -13,17 +13,12 @@ export const dynamic = "force-dynamic";
 /**
  * The signed-in home. For now the heading and subtitle only: projects,
  * templates and the new-project flow come over from canhav.dev in a later
- * step. An account that has not finished signing up is sent to the steps.
+ * step. An account that has not finished signing up gets the steps as a
+ * pop-up over this page.
  */
-export default async function StudioPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ welcome?: string }>;
-}) {
-  const { welcome } = await searchParams;
+export default async function StudioPage() {
   const gate = await getOnboardingGate();
   if (gate === "signed-out") redirect(loginPathFor(STUDIO_PATH));
-  if (gate === "onboard") redirect(WELCOME_PATH);
 
   return (
     <div className="container py-14 md:py-20">
@@ -43,7 +38,7 @@ export default async function StudioPage({
           </CardSection>
         </Card>
       ) : (
-        <WelcomeToast show={welcome === "1"} />
+        <StudioOnboarding onboard={gate === "onboard"} />
       )}
     </div>
   );

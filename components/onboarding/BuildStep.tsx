@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { ClerkUser } from "@/lib/clerk-types";
 
 import { Button } from "@/components/ui/Button";
-import { ChipRadioGroup } from "@/components/ui/ChipGroup";
 import { Field, Input } from "@/components/ui/Input";
+import { SelectField } from "@/components/ui/Select";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
 import { errorSentence } from "@/lib/clerk-errors";
+import type { ClerkUser } from "@/lib/clerk-types";
 import {
   EXPERIENCE_OPTIONS,
   IDE_OPTIONS,
@@ -54,9 +54,9 @@ export function BuildStep({ user, onDone, onBack }: { user: ClerkUser; onDone: (
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <p className="text-sm leading-relaxed text-ink-300">{B.lead}</p>
-      <ChipRadioGroup label={B.role} value={role} onChange={setRole} options={ROLE_OPTIONS} />
+      <SelectField label={B.role} value={role} onChange={setRole} options={ROLE_OPTIONS} clearable placeholder={B.placeholder} />
       {role === "other" ? (
         <Field label={B.roleOther}>
           <Input
@@ -67,8 +67,23 @@ export function BuildStep({ user, onDone, onBack }: { user: ClerkUser; onDone: (
           />
         </Field>
       ) : null}
-      <ChipRadioGroup label={B.experience} value={experience} onChange={setExperience} options={EXPERIENCE_OPTIONS} />
-      <ChipRadioGroup label={B.ide} hint={B.ideHint} value={ide} onChange={setIde} options={IDE_OPTIONS} />
+      <SelectField
+        label={B.experience}
+        value={experience}
+        onChange={setExperience}
+        options={EXPERIENCE_OPTIONS}
+        clearable
+        placeholder={B.placeholder}
+      />
+      <SelectField
+        label={B.ide}
+        hint={B.ideHint}
+        value={ide}
+        onChange={setIde}
+        options={IDE_OPTIONS}
+        clearable
+        placeholder={B.placeholder}
+      />
       {error ? (
         <StatusChip tone="error" variant="block" role="alert">
           {error}

@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { isAuthConfigured } from "@/lib/auth";
-import { LOGIN_PATH, STUDIO_PATH, WELCOME_PATH } from "@/lib/auth-paths";
+import { LOGIN_PATH, STUDIO_PATH } from "@/lib/auth-paths";
 
 /**
  * Site-wide ClerkProvider so the nav can reflect signed-in state everywhere.
@@ -28,7 +28,7 @@ export function AppClerkProvider({ children }: { children: React.ReactNode }) {
       signInUrl={LOGIN_PATH}
       signUpUrl={LOGIN_PATH}
       signInFallbackRedirectUrl={STUDIO_PATH}
-      signUpFallbackRedirectUrl={WELCOME_PATH}
+      signUpFallbackRedirectUrl={STUDIO_PATH}
       afterSignOutUrl="/"
       appearance={DARK_APPEARANCE}
     >

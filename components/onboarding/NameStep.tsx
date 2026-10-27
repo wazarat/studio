@@ -68,7 +68,7 @@ export function NameStep({ user, onDone }: { user: ClerkUser; onDone: () => void
           <Input autoComplete="family-name" maxLength={NAME_MAX} value={last} onChange={(e) => setLast(e.target.value)} />
         </Field>
       </div>
-      <Field label={N.handle} required error={errors.handle} hint={N.handleHint}>
+      <Field label={N.handle} required error={errors.handle}>
         <Input
           autoComplete="username"
           autoCapitalize="none"

@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClerkUser } from "@/lib/clerk-types";
 
 import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { AUTH_COPY } from "@/content/auth";
 import { errorSentence } from "@/lib/clerk-errors";
+import type { ClerkUser } from "@/lib/clerk-types";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
+/**
+ * The avatar step. An account made with Google already carries its Google
+ * picture, which shows here and can be removed. Next uploads a picked file
+ * if there is one and otherwise just moves on.
+ */
 export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: () => void; onBack: () => void }) {
   const A = AUTH_COPY.welcome.avatar;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,13 +48,33 @@ export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: 
     setFile(f);
   }
 
-  async function upload() {
-    if (!file) return;
+  async function next() {
+    if (!file) {
+      onDone();
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await user.setProfileImage({ file });
       onDone();
+    } catch (err) {
+      setError(errorSentence(err, AUTH_COPY.welcome.failed));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    setError(null);
+    if (file) {
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    setSaving(true);
+    try {
+      await user.setProfileImage({ file: null });
     } catch (err) {
       setError(errorSentence(err, AUTH_COPY.welcome.failed));
     } finally {
@@ -81,9 +106,16 @@ export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: 
             className="sr-only"
             onChange={(e) => pick(e.target.files?.[0] ?? null)}
           />
-          <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-            {file || user.hasImage ? A.change : A.pick}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => inputRef.current?.click()}>
+              {shown ? A.change : A.pick}
+            </Button>
+            {shown ? (
+              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void remove()}>
+                {A.remove}
+              </Button>
+            ) : null}
+          </div>
           {file ? <p className="text-xs text-ink-500">{file.name}</p> : null}
         </div>
       </div>
@@ -93,11 +125,8 @@ export function AvatarStep({ user, onDone, onBack }: { user: ClerkUser; onDone: 
         </StatusChip>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" disabled={!file || saving} onClick={() => void upload()}>
-          {saving ? AUTH_COPY.welcome.saving : A.upload}
-        </Button>
-        <Button type="button" variant="secondary" disabled={saving} onClick={onDone}>
-          {A.skip}
+        <Button type="button" disabled={saving} onClick={() => void next()}>
+          {saving ? AUTH_COPY.welcome.saving : A.next}
         </Button>
         <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onBack}>
           {A.back}

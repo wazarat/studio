@@ -1,7 +1,6 @@
 export const LOGIN_PATH = "/login";
 export const SIGNUP_PATH = "/login?mode=signup";
 export const STUDIO_PATH = "/studio";
-export const WELCOME_PATH = "/welcome";
 
 /**
  * A redirect target we are willing to follow after sign-in. Clerk's

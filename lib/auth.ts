@@ -12,7 +12,7 @@ export function isAuthConfigured(): boolean {
 export type OnboardingGate = "unconfigured" | "signed-out" | "onboard" | "ready";
 
 /**
- * The one server-side check for /studio, /welcome and /login. auth() throws
+ * The one server-side check for /studio and /login. auth() throws
  * unless clerkMiddleware ran, and the middleware no-ops without keys, so the
  * config guard comes first. One Backend API call (currentUser) per request:
  * fine for two pages; a session claim can replace it once Studio grows.

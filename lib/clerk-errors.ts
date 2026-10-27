@@ -4,8 +4,8 @@ import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 const COPY: Record<string, string> = {
   form_identifier_exists: "That is already taken.",
   form_param_format_invalid: "That value is not in the right format.",
-  form_username_invalid_length: "Use between 3 and 32 characters.",
-  form_username_invalid_character: "Letters, numbers and underscores only.",
+  form_username_invalid_length: "A username is 3 to 32 characters: letters, numbers and underscores.",
+  form_username_invalid_character: "A username is 3 to 32 characters: letters, numbers and underscores.",
   too_many_requests: "Too many attempts. Wait a moment and try again.",
 };
 
