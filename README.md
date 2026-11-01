@@ -82,9 +82,16 @@ through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
   `lib/strategies/candles.ts` is the first `CandleSource`, Ostium's own
   daily candles (history from 2024-01-01 for crypto, later for newer
   markets). Every result shows where its history starts.
-- `/studio` lists the account's strategies with their latest backtest and
-  has New strategy; the form, the list and the strategy page are behind the
-  admin allowlist while this is internal.
+- `/studio` is a trader's dashboard (step 4b): an account strip, the
+  strategies table with return, drawdown, open position, last signal and
+  next check, an activity feed from each strategy's latest backtest, and
+  for an empty account the headline markets with three templates.
+- `/studio/strategies/new` and `/studio/strategies/[id]` are one
+  workspace: markets rail, Lightweight Charts with the rule drawn and the
+  backtest's trades marked, a strategy panel with a leverage slider capped
+  at the tightest limit, and Performance, Trades and Costs tabs. Every
+  change re-runs the engine in the browser; Save runs it on the server and
+  stores the result. Allowlist only while this is internal.
 
 ## Run
 
