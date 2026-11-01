@@ -82,6 +82,25 @@ describe("runBacktest", () => {
     expect(r.buyAndHold.feesUsd).toBeCloseTo(1.74);
     expect(r.buyAndHold.returnPct).toBeCloseTo(-1.74);
     expect(r.skipped).toHaveLength(0);
+    // Fees split and the dollar drawdown.
+    expect(r.strategy.openingFeesUsd).toBeCloseTo(1.2);
+    expect(r.strategy.rolloverUsd).toBeCloseTo(0.3);
+    expect(r.strategy.openingFeesUsd + r.strategy.rolloverUsd).toBeCloseTo(r.strategy.feesUsd);
+    expect(r.strategy.maxDrawdownUsd).toBeCloseTo(199.18 - 138.5, 2);
+  });
+
+  it("buy and hold is a fixed position: price PnL is notional times the price change, no rebalancing", () => {
+    const candles = bars([10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+    const r = runBacktest({ spec: spec({ entry: { kind: "breakout", lookback: 2 } }), candles, market: market({ rollover8h: { long: 0, short: 0 } }) });
+    const b = r.buyAndHold.trade!;
+    expect(b.pricePnlUsd).toBeCloseTo(200 * (19 / 12 - 1));
+    expect(r.buyAndHold.rolloverUsd).toBe(0);
+    expect(r.buyAndHold.returnPct).toBeCloseTo((200 * (19 / 12 - 1) - 1.2) / 100 * 100);
+    // A negative rollover rate credits the holder and lowers total fees below the opening fees.
+    const credited = runBacktest({ spec: spec({ entry: { kind: "breakout", lookback: 2 } }), candles, market: market({ rollover8h: { long: -0.01, short: 0 } }) });
+    expect(credited.buyAndHold.rolloverUsd).toBeCloseTo(-0.36);
+    expect(credited.buyAndHold.feesUsd).toBeCloseTo(1.2 - 0.36);
+    expect(credited.buyAndHold.netPnlUsd).toBeCloseTo(r.buyAndHold.netPnlUsd + 0.36);
   });
 
   it("take profit fills inside the bar", () => {

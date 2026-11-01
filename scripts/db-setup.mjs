@@ -52,6 +52,84 @@ await sql`
     primary key (strategy_id, day)
   )`;
 
+// Paper trading (step 5).
+await sql`alter table studio.strategies add column if not exists paper_since timestamptz`;
+
+await sql`
+  create table if not exists studio.paper_accounts (
+    owner_id text primary key,
+    starting_balance_usd numeric not null default 10000,
+    created_at timestamptz not null default now()
+  )`;
+
+await sql`
+  create table if not exists studio.paper_positions (
+    id uuid primary key default gen_random_uuid(),
+    strategy_id uuid not null references studio.strategies(id) on delete cascade,
+    owner_id text not null,
+    market_id text not null,
+    symbol text not null,
+    side text not null default 'long' check (side in ('long', 'short')),
+    entry_price numeric not null,
+    notional_usd numeric not null,
+    collateral_usd numeric not null,
+    leverage numeric not null,
+    liquidation_price numeric not null,
+    take_profit numeric,
+    stop_loss numeric,
+    open_fee_usd numeric not null,
+    oracle_fee_usd numeric not null,
+    rollover_per_day_usd numeric not null,
+    rollover_usd numeric not null default 0,
+    rollover_through date not null,
+    days_held integer not null default 0,
+    entry_candle_date date not null,
+    opened_at timestamptz not null default now(),
+    closed_at timestamptz,
+    close_reason text check (close_reason in ('signal', 'take-profit', 'stop-loss', 'liquidation', 'stopped')),
+    exit_price numeric,
+    price_pnl_usd numeric,
+    fees_usd numeric,
+    realised_pnl_usd numeric,
+    check ((closed_at is null) = (close_reason is null))
+  )`;
+await sql`create unique index if not exists paper_positions_one_open_idx on studio.paper_positions (strategy_id) where closed_at is null`;
+await sql`create index if not exists paper_positions_owner_open_idx on studio.paper_positions (owner_id) where closed_at is null`;
+await sql`create index if not exists paper_positions_strategy_idx on studio.paper_positions (strategy_id, opened_at desc)`;
+
+await sql`
+  create table if not exists studio.paper_runs (
+    strategy_id uuid not null references studio.strategies(id) on delete cascade,
+    candle_date date not null,
+    started_at timestamptz not null default now(),
+    finished_at timestamptz,
+    outcome text check (outcome in ('hold', 'entered', 'exited', 'refused')),
+    note text,
+    primary key (strategy_id, candle_date)
+  )`;
+
+await sql`
+  create table if not exists studio.activity (
+    id uuid primary key default gen_random_uuid(),
+    strategy_id uuid not null references studio.strategies(id) on delete cascade,
+    owner_id text not null,
+    mode text not null check (mode in ('backtest', 'paper')),
+    kind text not null check (kind in ('signal', 'fill', 'refusal', 'close', 'skip')),
+    position_id uuid references studio.paper_positions(id) on delete set null,
+    candle_date date,
+    price numeric,
+    size_usd numeric,
+    fees_usd numeric,
+    pnl_usd numeric,
+    reason text,
+    meta jsonb,
+    dedupe_key text,
+    time timestamptz not null default now()
+  )`;
+await sql`create index if not exists activity_strategy_time_idx on studio.activity (strategy_id, time desc)`;
+await sql`create index if not exists activity_owner_time_idx on studio.activity (owner_id, time desc)`;
+await sql`create unique index if not exists activity_dedupe_idx on studio.activity (strategy_id, dedupe_key) where dedupe_key is not null`;
+
 const tables = await sql`
   select table_name from information_schema.tables
   where table_schema = 'studio' order by table_name`;

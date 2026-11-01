@@ -40,7 +40,8 @@ export type DraftAction =
   | { type: "caps"; patch: Partial<Draft["caps"]> }
   | { type: "tier"; tier: Tier; leverageCap: number }
   | { type: "name"; name: string }
-  | { type: "saved"; id: string };
+  | { type: "saved"; id: string }
+  | { type: "status"; status: Draft["status"] };
 
 /** Leverage on a 0.5 grid, never above the cap, never below 1. */
 export function clampLeverage(leverage: number, cap: number): number {
@@ -68,6 +69,8 @@ export function draftReducer(d: Draft, a: DraftAction): Draft {
       return a.name.trim() === "" ? { ...d, name: "", nameTouched: false } : { ...d, name: a.name, nameTouched: true };
     case "saved":
       return { ...d, id: a.id };
+    case "status":
+      return { ...d, status: a.status };
   }
 }
 

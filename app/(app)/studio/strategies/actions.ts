@@ -9,6 +9,9 @@ import { referenceFor, toleranceBps } from "@/lib/chainlink/read";
 import { checkRisk, type RiskFinding } from "@/lib/risk/check";
 import { runBacktest, type BacktestResult, type MarketSnapshot } from "@/lib/strategies/backtest";
 import { getStrategy, insertBacktest, insertStrategy, lossTodayUsd, storageConfigured, updateStrategy } from "@/lib/strategies/db";
+import { ensurePaperAccount, setStrategyStatus } from "@/lib/paper/store-neon";
+import { loadPaperForStrategy, type PaperForStrategy } from "@/lib/paper/summary";
+import { stopPaper } from "@/lib/paper/tick";
 import { cachedCandles, loadMarkets, type MarketsBundle } from "@/lib/strategies/markets";
 import { StrategySpecSchema, type StrategySpec } from "@/lib/strategies/spec";
 import { isTestnet, ostium } from "@/lib/venues/ostium";
@@ -80,6 +83,7 @@ export async function saveStrategyAction(raw: unknown, id?: string): Promise<Res
     if (id) {
       const row = await getStrategy(z.string().uuid().parse(id), ownerId);
       if (!row) return { ok: false, error: "Not found" };
+      if (row.status !== "draft") return { ok: false, error: "Stop paper trading before changing the strategy." };
       existingStatus = row.status;
     }
     const parsed = StrategySpecSchema.safeParse({ ...(raw as Record<string, unknown>), id: id ?? randomUUID(), status: existingStatus });
@@ -116,6 +120,45 @@ export async function saveStrategyAction(raw: unknown, id?: string): Promise<Res
     }
     const results = await storeBacktest(spec, market);
     return { ok: true, id: spec.id, warnings, results };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/* ---------- paper trading ---------- */
+
+export async function paperStateAction(id: string): Promise<Result<{ paper: PaperForStrategy }>> {
+  try {
+    const ownerId = await owner();
+    const row = await getStrategy(z.string().uuid().parse(id), ownerId);
+    if (!row) return { ok: false, error: "Not found" };
+    return { ok: true, paper: await loadPaperForStrategy(ownerId, row.id, row.status, row.paperSince) };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Start switches a saved draft to paper; Stop switches back and closes any open position at the live bid. */
+export async function setPaperStatusAction(id: string, status: "paper" | "draft"): Promise<Result<{ paper: PaperForStrategy; note: string }>> {
+  try {
+    const ownerId = await owner();
+    const row = await getStrategy(z.string().uuid().parse(id), ownerId);
+    if (!row) return { ok: false, error: "Not found" };
+    let note = "";
+    if (status === "paper") {
+      if (row.status !== "draft") return { ok: false, error: `The strategy is already ${row.status}.` };
+      await ensurePaperAccount(ownerId);
+      if (!(await setStrategyStatus(ownerId, row.id, "paper", "draft"))) return { ok: false, error: "Could not start paper trading." };
+      note = "Paper trading started. The latest closed candle is checked on the next tick, then every daily close.";
+    } else {
+      if (row.status !== "paper") return { ok: false, error: `The strategy is ${row.status}, not on paper.` };
+      if (!(await setStrategyStatus(ownerId, row.id, "draft", "paper"))) return { ok: false, error: "Could not stop paper trading." };
+      const stopped = await stopPaper(row.id);
+      note = `Paper trading stopped. ${stopped.note}`;
+    }
+    const fresh = await getStrategy(row.id, ownerId);
+    const paper = await loadPaperForStrategy(ownerId, row.id, fresh?.status ?? status, fresh?.paperSince ?? null);
+    return { ok: true, paper, note };
   } catch (error) {
     return fail(error);
   }

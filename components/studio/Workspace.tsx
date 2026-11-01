@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useTransition } from "react";
 
-import { candlesAction, marketsAction, saveStrategyAction } from "@/app/(app)/studio/strategies/actions";
+import { candlesAction, marketsAction, paperStateAction, saveStrategyAction, setPaperStatusAction } from "@/app/(app)/studio/strategies/actions";
 import { PriceChart } from "@/components/charts/dynamic";
 import { MarketsRail } from "@/components/studio/MarketsRail";
 import { RulePanel } from "@/components/studio/RulePanel";
@@ -11,13 +11,16 @@ import { ResultsTabs } from "@/components/studio/ResultsTabs";
 import { useDebouncedValue } from "@/components/studio/useDebouncedValue";
 import { useLivePrices } from "@/components/studio/useLivePrices";
 import { inputClasses } from "@/components/ui/Input";
+import { paperMarkersFor } from "@/lib/paper/activity";
+import { unrealised } from "@/lib/paper/engine";
+import type { PaperForStrategy } from "@/lib/paper/summary";
 import { checkRisk, type RiskFinding } from "@/lib/risk/check";
 import { BacktestError, runBacktest, tradeCosts, type BacktestResult } from "@/lib/strategies/backtest";
 import { markersFor, overlaysFor, paneFor } from "@/lib/strategies/chart-data";
 import { draftReducer, generatedName, leverageCap, toSpec, type Draft } from "@/lib/strategies/draft";
 import { LIQUIDATION_LOSS_FRACTION, StrategySpecSchema, type StrategySpec } from "@/lib/strategies/spec";
 import { cn } from "@/lib/utils";
-import { formatAgo, formatPrice } from "@/lib/venues/format";
+import { formatAgo, formatPrice, formatUsd } from "@/lib/venues/format";
 import type { Candle, Market, Price } from "@/lib/venues/types";
 
 /**
@@ -34,6 +37,7 @@ export interface WorkspaceProps {
   initialDraft: Draft;
   initialCandles: Candle[] | null;
   savedSpec: StrategySpec | null;
+  initialPaper: PaperForStrategy | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -44,6 +48,9 @@ export function Workspace(props: WorkspaceProps) {
   const [changes, setChanges] = useState(props.changes);
   const [draft, dispatch] = useReducer(draftReducer, props.initialDraft);
   const [savedSpec, setSavedSpec] = useState<StrategySpec | null>(props.savedSpec);
+  const [paper, setPaper] = useState<PaperForStrategy | null>(props.initialPaper);
+  const [paperNote, setPaperNote] = useState<string | null>(null);
+  const [toggling, startToggle] = useTransition();
   const live = useLivePrices(props.prices, true);
   const now = useNow();
 
@@ -140,7 +147,69 @@ export function Workspace(props: WorkspaceProps) {
   }, [candles, debouncedSpec, market]);
   const overlays = useMemo(() => (candles && debouncedSpec ? overlaysFor(debouncedSpec.entry, candles) : []), [candles, debouncedSpec]);
   const pane = useMemo(() => (candles && debouncedSpec ? paneFor(debouncedSpec.entry, candles) : null), [candles, debouncedSpec]);
-  const markers = useMemo(() => markersFor(run.result), [run.result]);
+  const lastCandleTime = candles?.[candles.length - 1]?.time ?? null;
+  const markers = useMemo(() => {
+    const paperPositions = paper ? [...(paper.open ? [paper.open] : []), ...paper.closed] : [];
+    return [...markersFor(run.result), ...paperMarkersFor(paperPositions, lastCandleTime)].sort((a, b) => a.time - b.time);
+  }, [run.result, paper, lastCandleTime]);
+  const priceLines = useMemo(() => {
+    const p = paper?.open;
+    if (!p) return [];
+    const lines: { price: number; title: string; color: "signal" | "rose" | "muted" }[] = [
+      { price: p.entryPrice, title: "paper entry", color: "signal" },
+      { price: p.liquidationPrice, title: "liquidation", color: "rose" },
+    ];
+    if (p.takeProfit) lines.push({ price: p.takeProfit, title: "take profit", color: "muted" });
+    if (p.stopLoss) lines.push({ price: p.stopLoss, title: "stop loss", color: "muted" });
+    return lines;
+  }, [paper?.open]);
+
+  // Paper state refresh while on paper.
+  useEffect(() => {
+    if (!draft.id || paper?.status !== "paper") return;
+    const id = draft.id;
+    const t = setInterval(async () => {
+      const res = await paperStateAction(id);
+      if (res.ok) setPaper(res.paper);
+    }, 60_000);
+    return () => clearInterval(t);
+  }, [draft.id, paper?.status]);
+
+  const togglePaper = useCallback(
+    (status: "paper" | "draft") => {
+      if (!draft.id) return;
+      const id = draft.id;
+      setPaperNote(null);
+      startToggle(async () => {
+        const res = await setPaperStatusAction(id, status);
+        if (!res.ok) {
+          setPaperNote(res.error);
+          return;
+        }
+        setPaper(res.paper);
+        setPaperNote(res.note);
+        dispatch({ type: "status", status: res.paper.status });
+        setSavedSpec((prev) => (prev ? { ...prev, status: res.paper.status } : prev));
+        router.refresh();
+      });
+    },
+    [draft.id, router],
+  );
+
+  // Paper since start versus what the backtest expected over the same days.
+  const sinceLine = useMemo(() => {
+    if (!paper || paper.status !== "paper" || !paper.since) return null;
+    const openU = paper.open && mid ? unrealised(paper.open, mid) : 0;
+    const net = paper.realisedSinceStartUsd + openU;
+    let expected: number | null = null;
+    if (run.result) {
+      const eq = run.result.equity;
+      const k0 = eq.findIndex((p) => p.time + DAY_MS > paper.since!);
+      if (k0 >= 0 && eq.length > 0) expected = eq[eq.length - 1].equityUsd - (k0 > 0 ? eq[k0 - 1].equityUsd : draft.size.collateralUsd);
+    }
+    const s = (v: number) => `${v >= 0 ? "+" : "−"}${formatUsd(Math.abs(v))}`;
+    return `Paper since ${new Date(paper.since).toISOString().slice(0, 10)}: ${s(paper.realisedSinceStartUsd)} realised, ${s(openU)} open, net ${s(net)}${expected === null ? "" : ` · the backtest expected ${s(expected)} over the same days`}`;
+  }, [paper, mid, run.result, draft.size.collateralUsd]);
 
   const dirty = JSON.stringify({ ...spec, id: "" }) !== JSON.stringify(savedSpec ? { ...savedSpec, id: "" } : null);
 
@@ -209,15 +278,31 @@ export function Workspace(props: WorkspaceProps) {
         </div>
         {!open ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{market.symbol} is closed right now. You can design and save; the checker refuses an open until it reopens.</p> : null}
         {savedNote ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{savedNote}</p> : null}
+        {paper?.open ? (
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-ink-700/40 px-4 py-2 text-xs">
+            <span className="font-medium text-signal-400">Paper long</span>
+            <span className="tabular-nums text-ink-200">{formatUsd(paper.open.notionalUsd, 0)} at {paper.open.leverage}x from {formatPrice(paper.open.entryPrice)}</span>
+            <span className="tabular-nums text-ink-400">liquidation {formatPrice(paper.open.liquidationPrice)}</span>
+            {paper.open.takeProfit ? <span className="tabular-nums text-ink-400">take profit {formatPrice(paper.open.takeProfit)}</span> : null}
+            {paper.open.stopLoss ? <span className="tabular-nums text-ink-400">stop loss {formatPrice(paper.open.stopLoss)}</span> : null}
+            {mid ? (
+              <span className={cn("tabular-nums", unrealised(paper.open, mid) < 0 ? "text-rose-400" : "text-ink-50")}>
+                {unrealised(paper.open, mid) >= 0 ? "+" : "−"}{formatUsd(Math.abs(unrealised(paper.open, mid)))} live
+              </span>
+            ) : null}
+            <span className="text-ink-500">opened {new Date(paper.open.openedAt).toISOString().slice(0, 10)}</span>
+          </div>
+        ) : null}
+        {sinceLine ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-300">{sinceLine}</p> : null}
 
         <div className="relative h-[420px] bg-ink-900">
-          {candles ? <PriceChart candles={candles} overlays={overlays} pane={pane} markers={markers} /> : null}
+          {candles ? <PriceChart candles={candles} overlays={overlays} pane={pane} markers={markers} priceLines={priceLines} /> : null}
           {!candles ? (
             <p className="absolute inset-0 flex items-center justify-center text-sm text-ink-400">{candleError ?? "Loading history…"}</p>
           ) : null}
         </div>
 
-        <ResultsTabs result={run.result} error={run.error} startUsd={draft.size.collateralUsd} />
+        <ResultsTabs result={run.result} error={run.error} startUsd={draft.size.collateralUsd} paper={paper} symbol={market.symbol} />
       </section>
 
       <aside className="border-t border-ink-700/40 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto lg:border-l lg:border-t-0">
@@ -237,6 +322,11 @@ export function Workspace(props: WorkspaceProps) {
           saveError={saveError}
           saveRefusals={saveRefusals}
           onSave={onSave}
+          paper={{ status: paper?.status ?? draft.status, since: paper?.since ?? null }}
+          onStart={() => togglePaper("paper")}
+          onStop={() => togglePaper("draft")}
+          toggling={toggling}
+          paperNote={paperNote}
         />
       </aside>
     </div>

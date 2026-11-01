@@ -83,9 +83,16 @@ export interface EquityPoint {
 export interface BacktestSummary {
   returnPct: number;
   maxDrawdownPct: number;
+  /** Peak-to-trough on the equity curve, USD. */
+  maxDrawdownUsd: number;
   trades: number;
   winRatePct: number;
+  /** Opening fees plus rollover; rollover can be negative when the venue pays holders. */
   feesUsd: number;
+  /** Open fee and oracle fees, USD. */
+  openingFeesUsd: number;
+  /** Signed: positive paid, negative received. */
+  rolloverUsd: number;
   netPnlUsd: number;
   finalEquityUsd: number;
 }
@@ -289,19 +296,26 @@ function simulate(
 function summarise(start: number, trades: BacktestTrade[], curve: number[]): BacktestSummary {
   const netPnlUsd = trades.reduce((s, t) => s + t.netPnlUsd, 0);
   const feesUsd = trades.reduce((s, t) => s + t.fees.totalUsd, 0);
+  const openingFeesUsd = trades.reduce((s, t) => s + t.fees.openUsd + t.fees.oracleUsd, 0);
+  const rolloverUsd = trades.reduce((s, t) => s + t.fees.rolloverUsd, 0);
   let peak = start;
   let maxDd = 0;
+  let maxDdUsd = 0;
   for (const e of curve) {
     peak = Math.max(peak, e);
     if (peak > 0) maxDd = Math.max(maxDd, (peak - e) / peak);
+    maxDdUsd = Math.max(maxDdUsd, peak - e);
   }
   const wins = trades.filter((t) => t.netPnlUsd > 0).length;
   return {
     returnPct: (netPnlUsd / start) * 100,
     maxDrawdownPct: maxDd * 100,
+    maxDrawdownUsd: maxDdUsd,
     trades: trades.length,
     winRatePct: trades.length ? (wins / trades.length) * 100 : 0,
     feesUsd,
+    openingFeesUsd,
+    rolloverUsd,
     netPnlUsd,
     finalEquityUsd: start + netPnlUsd,
   };

@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { Workspace } from "@/components/studio/Workspace";
 import { getInternalAdminGate } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
+import { loadPaperForStrategy } from "@/lib/paper/summary";
 import { getStrategy } from "@/lib/strategies/db";
 import { draftFromSpec } from "@/lib/strategies/draft";
 import { cachedCandles, loadMarkets } from "@/lib/strategies/markets";
@@ -24,7 +25,10 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
 
   const bundle = await loadMarkets();
   if (!bundle.markets.some((m) => m.id === row.spec.market.marketId)) notFound();
-  const candles = await cachedCandles(row.spec.market.marketId).catch(() => null);
+  const [candles, paper] = await Promise.all([
+    cachedCandles(row.spec.market.marketId).catch(() => null),
+    loadPaperForStrategy(row.ownerId, row.id, row.status, row.paperSince),
+  ]);
 
   return (
     <Workspace
@@ -34,6 +38,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
       initialDraft={draftFromSpec(row.spec)}
       initialCandles={candles}
       savedSpec={row.spec}
+      initialPaper={paper}
     />
   );
 }

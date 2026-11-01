@@ -56,6 +56,11 @@ export interface RulePanelProps {
   saveError: string | null;
   saveRefusals: RiskFinding[];
   onSave: () => void;
+  paper: { status: "draft" | "paper" | "live"; since: number | null };
+  onStart: () => void;
+  onStop: () => void;
+  toggling: boolean;
+  paperNote: string | null;
 }
 
 export function RulePanel(p: RulePanelProps) {
@@ -67,7 +72,9 @@ export function RulePanel(p: RulePanelProps) {
       .map((f) => f.message)
       .join(" ") || undefined;
   const blocking = refusals.some((f) => refusalSlot(f.code) !== "market" && refusalSlot(f.code) !== "note");
-  const canSave = p.dirty && Object.keys(issues).length === 0 && !blocking && !p.saving;
+  const onPaper = p.paper.status === "paper";
+  const canSave = p.dirty && Object.keys(issues).length === 0 && !blocking && !p.saving && !onPaper;
+  const canStart = Boolean(draft.id) && !p.dirty && Object.keys(issues).length === 0 && !blocking && p.paper.status === "draft" && !p.toggling;
   const entry = draft.entry;
   const notional = draft.size.collateralUsd * draft.size.leverage;
   const capLabel =
@@ -201,13 +208,30 @@ export function RulePanel(p: RulePanelProps) {
 
       <div className="mt-auto space-y-2 border-t border-ink-700/40 p-4">
         {p.saveError ? <p className="text-xs text-rose-400">{p.saveError}</p> : null}
-        <Button type="button" className="w-full" disabled={!canSave} onClick={p.onSave}>
-          {p.saving ? "Saving…" : draft.id ? "Save changes" : "Save strategy"}
-        </Button>
-        <Button type="button" variant="secondary" className="w-full" disabled>
-          Start paper trading
-        </Button>
-        <p className="text-center text-[11px] text-ink-500">{p.dirty ? "Unsaved changes" : draft.id ? "Saved" : "Not saved yet"} · paper trading is the next step</p>
+        {p.paperNote ? <p className="text-xs text-ink-300">{p.paperNote}</p> : null}
+        {onPaper ? (
+          <Button type="button" variant="secondary" className="w-full" disabled={p.toggling} onClick={p.onStop}>
+            {p.toggling ? "Stopping…" : "Stop paper trading"}
+          </Button>
+        ) : (
+          <>
+            <Button type="button" className="w-full" disabled={!canSave} onClick={p.onSave}>
+              {p.saving ? "Saving…" : draft.id ? "Save changes" : "Save strategy"}
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" disabled={!canStart} onClick={p.onStart}>
+              {p.toggling ? "Starting…" : "Start paper trading"}
+            </Button>
+          </>
+        )}
+        <p className="text-center text-[11px] text-ink-500">
+          {onPaper
+            ? `Paper since ${p.paper.since ? new Date(p.paper.since).toISOString().slice(0, 10) : "today"} · stop to edit`
+            : p.dirty
+              ? "Unsaved changes · save before starting paper trading"
+              : draft.id
+                ? "Saved · paper trades at the live Ostium price, no wallet"
+                : "Not saved yet"}
+        </p>
       </div>
     </div>
   );

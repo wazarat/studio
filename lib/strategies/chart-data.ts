@@ -32,6 +32,7 @@ export interface ChartMarker {
   time: number;
   kind: "entry" | "exit" | "refused";
   text: string;
+  source?: "backtest" | "paper";
 }
 
 const DAY_MS = 86_400_000;

@@ -28,5 +28,5 @@ export default async function NewStrategyPage({ searchParams }: { searchParams: 
   const draft = newDraft(market.id, template ? { entry: template.draft.entry, exit: { ...template.draft.exit }, size: { ...template.draft.size } } : {});
   const candles = await cachedCandles(market.id).catch(() => null);
 
-  return <Workspace markets={bundle.markets} prices={bundle.prices} changes={bundle.changes} initialDraft={draft} initialCandles={candles} savedSpec={null} />;
+  return <Workspace markets={bundle.markets} prices={bundle.prices} changes={bundle.changes} initialDraft={draft} initialCandles={candles} savedSpec={null} initialPaper={null} />;
 }

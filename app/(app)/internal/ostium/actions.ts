@@ -6,6 +6,8 @@ import type { PriceComparison } from "@/lib/chainlink/compare";
 import { referenceFor, toleranceBps } from "@/lib/chainlink/read";
 import { requireInternalAdmin } from "@/lib/auth";
 import { checkRisk, type RiskResult, type StrategyRiskState, type Tier } from "@/lib/risk/check";
+import { runPaperTick } from "@/lib/paper/tick";
+import type { TickReport } from "@/lib/paper/store";
 import { getDevSigner } from "@/lib/signers/dev";
 import {
   findOrdersByTxHash,
@@ -188,4 +190,9 @@ export async function devUpdateAction(intent: UpdateIntent): Promise<Result<{ ha
 
 export async function devStatusAction(hash: Hex): Promise<Result<{ orders: OrderStatus[] }>> {
   return guarded(async () => ({ orders: await findOrdersByTxHash(hex.parse(hash)) }));
+}
+
+/** The same tick the cron runs, by hand. */
+export async function runPaperTickAction(): Promise<Result<{ report: TickReport }>> {
+  return guarded(async () => ({ report: await runPaperTick() }));
 }

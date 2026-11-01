@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <AppShellProvider>
       <ThemeScript />
       <AppTheme />
-      <div className="relative flex min-h-screen flex-col bg-ink-950">
+      <div className="app-contrast relative flex min-h-screen flex-col bg-ink-950">
         <AppHeader />
         <main className="flex-1">{children}</main>
       </div>

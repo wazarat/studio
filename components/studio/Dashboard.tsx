@@ -55,16 +55,35 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
       <div className="grid gap-3 sm:grid-cols-3">
         {(
           [
-            [STUDIO_COPY.strip.accountValue, formatUsd(0)],
-            [STUDIO_COPY.strip.today, formatUsd(0)],
-            [STUDIO_COPY.strip.openPositions, "0"],
+            [
+              STUDIO_COPY.strip.accountValue,
+              formatUsd(data.paper?.accountValueUsd ?? 0),
+              data.paper ? `Paper · cash ${formatUsd(data.paper.balanceUsd)} of ${formatUsd(data.paper.startingUsd, 0)}` : STUDIO_COPY.strip.note,
+            ],
+            [
+              STUDIO_COPY.strip.today,
+              `${(data.paper?.todayUsd ?? 0) < 0 ? "−" : "+"}${formatUsd(Math.abs(data.paper?.todayUsd ?? 0))}`,
+              data.paper ? "Realised today plus open positions at the current price" : STUDIO_COPY.strip.note,
+            ],
+            [
+              STUDIO_COPY.strip.openPositions,
+              String(data.paper?.open.length ?? 0),
+              data.paper && data.paper.open.length > 0
+                ? data.paper.open
+                    .slice(0, 2)
+                    .map((p) => `${p.symbol} ${p.unrealisedUsd === null ? "" : `${p.unrealisedUsd >= 0 ? "+" : "−"}$${Math.abs(p.unrealisedUsd).toFixed(2)}`}`)
+                    .join(" · ")
+                : data.paper
+                  ? "No paper position open"
+                  : STUDIO_COPY.strip.note,
+            ],
           ] as const
-        ).map(([label, value]) => (
+        ).map(([label, value, note]) => (
           <Card key={label}>
             <CardSection className="py-4">
               <p className="text-[11px] uppercase tracking-wide text-ink-500">{label}</p>
               <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink-50">{value}</p>
-              <p className="mt-1 text-[11px] text-ink-500">{STUDIO_COPY.strip.note}</p>
+              <p className="mt-1 text-[11px] text-ink-500">{note}</p>
             </CardSection>
           </Card>
         ))}
@@ -105,7 +124,7 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
                       <span className="ml-2 text-ink-500">{r.rule}</span>
                     </td>
                     <td className={TD}>{r.symbol}</td>
-                    <td className={TD}>{r.status}</td>
+                    <td className={cn(TD, r.status === "paper" && "text-signal-400")}>{r.status}</td>
                     <td className={cn(TD, "text-right tabular-nums text-ink-100")}>{r.returnPct === null ? "–" : pct(r.returnPct)}</td>
                     <td className={cn(TD, "text-right tabular-nums")}>{r.maxDrawdownPct === null ? "–" : `${r.maxDrawdownPct.toFixed(1)}%`}</td>
                     <td className={TD}>{r.openPosition ?? "None"}</td>

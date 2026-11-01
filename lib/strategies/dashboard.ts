@@ -1,5 +1,8 @@
 import "server-only";
 
+import { mergeActivity, paperEvent } from "@/lib/paper/activity";
+import { paperActivityFor } from "@/lib/paper/store-neon";
+import { loadPaperSummary, type PaperSummary } from "@/lib/paper/summary";
 import { activityFromBacktests, type ActivityEvent } from "@/lib/strategies/activity";
 import { latestBacktests, listStrategies, storageConfigured } from "@/lib/strategies/db";
 import { loadMarkets, type MarketsBundle } from "@/lib/strategies/markets";
@@ -30,6 +33,7 @@ export interface DashboardData extends MarketsBundle {
   activity: ActivityEvent[];
   nextCheckAt: number;
   storage: boolean;
+  paper: PaperSummary | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -43,11 +47,13 @@ export async function loadDashboard(userId: string | null, admin: boolean): Prom
   const bundle = await loadMarkets();
   const nextCheckAt = Math.ceil(Date.now() / DAY_MS) * DAY_MS;
   const storage = storageConfigured();
-  if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage };
+  if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage, paper: null };
 
-  const strategies = await listStrategies(userId);
+  const [strategies, paper, paperRows] = await Promise.all([listStrategies(userId), loadPaperSummary(userId, bundle.prices), paperActivityFor(userId, null, 50)]);
   const backtests = await latestBacktests(strategies.map((s) => s.id));
   const results = new Map(Array.from(backtests, ([id, b]) => [id, b.results]));
+  const byId = new Map(strategies.map((s) => [s.id, s]));
+  const openByStrategy = new Map(paper.open.map((p) => [p.strategyId, p]));
 
   const rows: StrategyRowView[] = strategies.map((s) => {
     const r = results.get(s.id);
@@ -64,18 +70,33 @@ export async function loadDashboard(userId: string | null, admin: boolean): Prom
       status: s.status === "draft" ? "backtest" : s.status,
       returnPct: r ? r.strategy.returnPct : null,
       maxDrawdownPct: r ? r.strategy.maxDrawdownPct : null,
-      openPosition: last && last.exitReason === "end" ? `Long since ${day(last.entryTime)}` : null,
+      openPosition:
+        s.status === "paper" || openByStrategy.has(s.id)
+          ? (() => {
+              const p = openByStrategy.get(s.id);
+              if (!p) return null;
+              const u = p.unrealisedUsd;
+              return `Long since ${day(p.openedAt)}${u === null ? "" : ` · ${u >= 0 ? "+" : "−"}$${Math.abs(u).toFixed(2)}`}`;
+            })()
+          : last && last.exitReason === "end"
+            ? `Long since ${day(last.entryTime)} (backtest)`
+            : null,
       lastSignal,
       historyStart: r ? r.historyStart : null,
       updatedAt: s.updatedAt,
     };
   });
 
+  const paperEvents = paperRows.map((r) => {
+    const s = byId.get(r.strategyId);
+    return paperEvent(r, s?.name ?? "Strategy", s?.symbol ?? "");
+  });
   return {
     ...bundle,
     rows,
-    activity: activityFromBacktests(strategies, results),
+    activity: mergeActivity(activityFromBacktests(strategies, results), paperEvents),
     nextCheckAt,
     storage,
+    paper,
   };
 }

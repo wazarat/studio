@@ -20,6 +20,8 @@ export interface StrategyRow {
   status: StrategySpec["status"];
   tier: StrategySpec["tier"];
   spec: StrategySpec;
+  /** ms epoch when paper trading started; null when never started. */
+  paperSince: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +56,7 @@ function toStrategy(r: Record<string, unknown>): StrategyRow {
     status: r.status as StrategySpec["status"],
     tier: r.tier as StrategySpec["tier"],
     spec: StrategySpecSchema.parse(r.spec),
+    paperSince: r.paper_since ? new Date(r.paper_since as string).getTime() : null,
     createdAt: new Date(r.created_at as string).toISOString(),
     updatedAt: new Date(r.updated_at as string).toISOString(),
   };
@@ -149,12 +152,14 @@ export async function latestBacktests(strategyIds: string[]): Promise<Map<string
 }
 
 /** Realised loss today (UTC) for the loss stop; 0 until paper or live trading writes rows. */
-export async function lossTodayUsd(strategyId: string): Promise<number> {
+export async function lossTodayUsd(strategyId: string, day?: string): Promise<number> {
   const sql = getDb();
   if (!sql) return 0;
-  const rows = await sql`
-    select realised_pnl_usd from studio.daily_results
-    where strategy_id = ${strategyId} and day = (now() at time zone 'utc')::date`;
+  const rows = day
+    ? await sql`select realised_pnl_usd from studio.daily_results where strategy_id = ${strategyId} and day = ${day}::date`
+    : await sql`
+        select realised_pnl_usd from studio.daily_results
+        where strategy_id = ${strategyId} and day = (now() at time zone 'utc')::date`;
   const pnl = rows[0] ? Number(rows[0].realised_pnl_usd) : 0;
   return pnl < 0 ? -pnl : 0;
 }

@@ -11,7 +11,7 @@ export const STUDIO_COPY = {
     accountValue: "Account value",
     today: "Today",
     openPositions: "Open positions",
-    note: "Paper and live trading start in the next step.",
+    note: "Live trading comes in a later step.",
   },
   table: {
     title: "Strategies",

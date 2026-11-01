@@ -11,8 +11,10 @@ import {
   devWalletAction,
   previewAction,
   rolloverAction,
+  runPaperTickAction,
   type PreviewOutcome,
 } from "@/app/(app)/internal/ostium/actions";
+import type { TickReport } from "@/lib/paper/store";
 import { useProjectCrumb } from "@/components/layout/AppShellContext";
 import { Button } from "@/components/ui/Button";
 import { Card, CardSection } from "@/components/ui/Card";
@@ -305,6 +307,18 @@ export function OstiumConsole({ testnet, builderAddress, toleranceBps, devSigner
 
   const selected = marketById.get(marketId);
 
+  /* ---------- paper tick ---------- */
+  const [tick, setTick] = useState<TickReport | null>(null);
+  const [tickError, setTickError] = useState<string | null>(null);
+  const [ticking, startTick] = useTransition();
+  const runTickNow = () =>
+    startTick(async () => {
+      setTickError(null);
+      const res = await runPaperTickAction();
+      if (res.ok) setTick(res.report);
+      else setTickError(res.error);
+    });
+
   return (
     <div className="container space-y-10 py-10 md:py-14">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -542,6 +556,45 @@ export function OstiumConsole({ testnet, builderAddress, toleranceBps, devSigner
                 </p>
               ) : null}
             </div>
+          </CardSection>
+        </Card>
+      </section>
+
+      {/* Paper trading */}
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-semibold text-ink-50">Paper trading</h2>
+        <Card>
+          <CardSection className="space-y-3">
+            <p className="text-sm text-ink-300">
+              One tick checks exits on every open paper position at the live bid, then runs the daily decision for every strategy on paper whose last closed candle has not been run. The cron calls the same function every five minutes.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="sm" variant="secondary" disabled={ticking} onClick={runTickNow}>
+                {ticking ? "Running…" : "Run tick now"}
+              </Button>
+              {tick ? (
+                <span className="text-xs tabular-nums text-ink-400">
+                  {tick.positionsChecked} positions checked · {tick.exits} exits · {tick.runs} runs · {tick.entries} entries · {tick.refusals} refusals · {tick.skips} skips
+                </span>
+              ) : null}
+              {tickError ? <span className="text-xs text-rose-400">{tickError}</span> : null}
+            </div>
+            {tick && (tick.lines.length > 0 || tick.errors.length > 0) ? (
+              <ul className="space-y-1 text-xs">
+                {tick.lines.map((l, i) => (
+                  <li key={`l${i}`} className="text-ink-300">
+                    {l}
+                  </li>
+                ))}
+                {tick.errors.map((e, i) => (
+                  <li key={`e${i}`} className="text-rose-400">
+                    {e}
+                  </li>
+                ))}
+              </ul>
+            ) : tick ? (
+              <p className="text-xs text-ink-500">Nothing to do: no strategy on paper is due and no position needed an exit.</p>
+            ) : null}
           </CardSection>
         </Card>
       </section>

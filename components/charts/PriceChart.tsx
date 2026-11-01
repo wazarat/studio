@@ -182,7 +182,7 @@ export function PriceChart({ candles, overlays, pane, markers, priceLines = [] }
       time: toChartTime(m.time) as Time,
       position: m.kind === "entry" ? "belowBar" : m.kind === "exit" ? "aboveBar" : "inBar",
       shape: m.kind === "entry" ? "arrowUp" : m.kind === "exit" ? "arrowDown" : "circle",
-      color: m.kind === "entry" ? c.electric : m.kind === "exit" ? c.strong : c.muted,
+      color: m.source === "paper" ? c.signal : m.kind === "entry" ? c.electric : m.kind === "exit" ? c.strong : c.muted,
       text: m.text,
       size: m.kind === "refused" ? 0.6 : 1,
     }));

@@ -144,6 +144,18 @@
   }
 }
 
+/* Signed-in app (step 5): secondary text one step brighter than the
+   landing page's tokens, which mirror canhav.dev. Scoped so the marketing
+   pages keep their look. */
+html.dark .app-contrast {
+  --ink-500: 104 112 132;
+  --ink-400: 134 142 162;
+}
+html.light .app-contrast {
+  --ink-500: 92 98 86;
+  --ink-400: 70 76 62;
+}
+
 @layer utilities {
   .text-gradient-brand {
     @apply bg-clip-text text-transparent;
