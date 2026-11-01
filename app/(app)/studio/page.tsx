@@ -1,24 +1,36 @@
+import { Plus } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 
-import { CreateProjectButton } from "@/components/studio/CreateProjectButton";
+import { StrategyList } from "@/components/studio/StrategyList";
 import { StudioOnboarding } from "@/components/studio/StudioOnboarding";
+import { Button } from "@/components/ui/Button";
 import { Card, CardSection } from "@/components/ui/Card";
 import { STUDIO_COPY } from "@/content/studio";
-import { getOnboardingGate } from "@/lib/auth";
+import { getInternalAdminGate, getOnboardingGate } from "@/lib/auth";
 import { STUDIO_PATH, loginPathFor } from "@/lib/auth-paths";
+import { latestBacktests, listStrategies, storageConfigured } from "@/lib/strategies/db";
 
 export const metadata: Metadata = { title: STUDIO_COPY.kicker, robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 /**
- * The signed-in home: the heading with Create project top right and, until
- * projects come over from canhav.dev, the empty state. An account that has
- * not finished signing up gets the steps as a pop-up over this page.
+ * The signed-in home (step 4): the account's strategies with their latest
+ * backtest, and New strategy top right. While strategies are internal the
+ * list and the button show only to the allowlist; everyone else sees the
+ * empty state. An account that has not finished signing up gets the steps
+ * as a pop-up over this page.
  */
 export default async function StudioPage() {
   const gate = await getOnboardingGate();
   if (gate === "signed-out") redirect(loginPathFor(STUDIO_PATH));
+  const admin = gate !== "unconfigured" && (await getInternalAdminGate()) === "admin";
+  const { userId } = gate === "unconfigured" ? { userId: null } : await auth();
+
+  const strategies = admin && userId ? await listStrategies(userId) : [];
+  const backtests = await latestBacktests(strategies.map((s) => s.id));
 
   return (
     <div className="container py-10 md:py-14">
@@ -29,7 +41,14 @@ export default async function StudioPage() {
           </h1>
           <p className="mt-3 text-base leading-relaxed text-ink-300">{STUDIO_COPY.subtitle}</p>
         </div>
-        {gate === "unconfigured" ? null : <CreateProjectButton />}
+        {admin ? (
+          <Button asChild>
+            <Link href="/studio/strategies/new">
+              <Plus aria-hidden className="h-4 w-4" />
+              {STUDIO_COPY.newStrategy}
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       {gate === "unconfigured" ? (
@@ -43,17 +62,31 @@ export default async function StudioPage() {
         </Card>
       ) : (
         <>
-          <Card className="mt-10">
-            <CardSection className="flex flex-col items-start gap-4 py-12 md:items-center md:text-center">
-              <div>
-                <h2 className="font-display text-xl font-semibold tracking-tight text-ink-50">
-                  {STUDIO_COPY.empty.title}
-                </h2>
-                <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-300">{STUDIO_COPY.empty.lead}</p>
-              </div>
-              <CreateProjectButton />
-            </CardSection>
-          </Card>
+          {admin && !storageConfigured() ? <p className="mt-6 text-sm text-rose-400">{STUDIO_COPY.storage}</p> : null}
+          {strategies.length > 0 ? (
+            <StrategyList strategies={strategies} backtests={backtests} />
+          ) : (
+            <Card className="mt-10">
+              <CardSection className="flex flex-col items-start gap-4 py-12 md:items-center md:text-center">
+                <div>
+                  <h2 className="font-display text-xl font-semibold tracking-tight text-ink-50">
+                    {STUDIO_COPY.empty.title}
+                  </h2>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-300">
+                    {admin ? STUDIO_COPY.empty.lead : STUDIO_COPY.soon}
+                  </p>
+                </div>
+                {admin ? (
+                  <Button asChild>
+                    <Link href="/studio/strategies/new">
+                      <Plus aria-hidden className="h-4 w-4" />
+                      {STUDIO_COPY.newStrategy}
+                    </Link>
+                  </Button>
+                ) : null}
+              </CardSection>
+            </Card>
+          )}
           <StudioOnboarding onboard={gate === "onboard"} />
         </>
       )}

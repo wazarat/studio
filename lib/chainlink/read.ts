@@ -3,7 +3,7 @@ import "server-only";
 import { createPublicClient, http, type Hex } from "viem";
 import { arbitrum } from "viem/chains";
 
-import { isFresh, type ChainlinkReading } from "@/lib/chainlink/compare";
+import { compareToReference, isFresh, type ChainlinkReading, type PriceComparison } from "@/lib/chainlink/compare";
 import { ARBITRUM_ONE_FEEDS, feedFor } from "@/lib/chainlink/feeds";
 
 /**
@@ -133,4 +133,10 @@ export async function readReferences(symbols: string[], nowMs = Date.now()): Pro
 export async function readReference(symbol: string): Promise<ChainlinkReading | null> {
   const all = await readReferences([symbol]);
   return all.get(symbol) ?? null;
+}
+
+/** The comparison for one market, or null when it has no feed. */
+export async function referenceFor(symbol: string, venueMid: number): Promise<PriceComparison | null> {
+  const reading = await readReference(symbol);
+  return reading ? compareToReference(venueMid, reading, toleranceBps()) : null;
 }

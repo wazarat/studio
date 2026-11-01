@@ -15,7 +15,7 @@ import type { Position } from "@/lib/venues/types";
  * back. Skipped unless OSTIUM_SMOKE=1 and a dev key is set, because it
  * spends real Sepolia gas and mock USDC. Run it with the env loaded:
  *
- *   set -a; . ./.env.local; set +a; OSTIUM_SMOKE=1 npx vitest run lib/venues/ostium.smoke.test.ts
+ *   OSTIUM_SMOKE=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run lib/venues/ostium.smoke.test.ts
  */
 
 const enabled = process.env.OSTIUM_SMOKE === "1" && Boolean(process.env.OSTIUM_DEV_PRIVATE_KEY);

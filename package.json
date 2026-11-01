@@ -8,10 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:setup": "node --env-file=.env.local scripts/db-setup.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.21",
+    "@neondatabase/serverless": "^1.2.0",
     "@ostium/builder-sdk": "^0.12.0",
     "@vercel/analytics": "^2.0.1",
     "clsx": "^2.1.1",

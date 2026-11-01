@@ -2,8 +2,8 @@
 
 import { z } from "zod";
 
-import { compareToReference, type PriceComparison } from "@/lib/chainlink/compare";
-import { readReference, toleranceBps } from "@/lib/chainlink/read";
+import type { PriceComparison } from "@/lib/chainlink/compare";
+import { referenceFor, toleranceBps } from "@/lib/chainlink/read";
 import { requireInternalAdmin } from "@/lib/auth";
 import { checkRisk, type RiskResult, type StrategyRiskState, type Tier } from "@/lib/risk/check";
 import { getDevSigner } from "@/lib/signers/dev";
@@ -68,11 +68,6 @@ async function guarded<T>(fn: () => Promise<T>): Promise<Result<T>> {
   } catch (error) {
     return fail(error);
   }
-}
-
-async function referenceFor(symbol: string, venueMid: number): Promise<PriceComparison | null> {
-  const reading = await readReference(symbol);
-  return reading ? compareToReference(venueMid, reading, toleranceBps()) : null;
 }
 
 export interface PreviewOutcome {

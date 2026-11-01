@@ -55,6 +55,37 @@ after the code and block the session.
 Not in this step: the Neon database, light mode, the custom domain, the
 project list and templates on `/studio`.
 
+## Step 3: Ostium behind a venue layer
+
+`lib/venues/types.ts` is the `Venue` interface; `lib/venues/ostium.ts` is
+the only file that imports the SDK. Reads go through the read-only client,
+trades through the build-only methods that return unsigned transactions.
+`lib/chainlink/` reads the mainnet price feeds as the independent check,
+`lib/risk/check.ts` is the pure risk checker, and `/internal/ostium` (email
+allowlist, off the nav) shows markets, prices next to Chainlink, a preview
+through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
+
+## Step 4: database, strategy and first backtest
+
+- Neon Postgres, the `studio` schema, through `lib/db.ts` (the same
+  `neon()` client as canhav.dev). `scripts/db-setup.mjs` creates the tables
+  and is safe to rerun: `npm run db:setup` reads `DATABASE_URL` from
+  `.env.local`. Use a dev branch's pooled URL locally; production gets its
+  own branch in the Vercel env.
+- `lib/strategies/spec.ts` is the one validated strategy object; long only
+  for now, with `direction` stored so shorts can follow. One entry rule
+  (MA cross, RSI, breakout), exits on the opposite signal plus optional take
+  profit and stop loss, size, caps, tier, status, and a daily candle-close
+  wake trigger.
+- `lib/strategies/backtest.ts` is the pure engine on daily candles with the
+  step 3 costs and the risk checker on every simulated open;
+  `lib/strategies/candles.ts` is the first `CandleSource`, Ostium's own
+  daily candles (history from 2024-01-01 for crypto, later for newer
+  markets). Every result shows where its history starts.
+- `/studio` lists the account's strategies with their latest backtest and
+  has New strategy; the form, the list and the strategy page are behind the
+  admin allowlist while this is internal.
+
 ## Run
 
 ```bash
