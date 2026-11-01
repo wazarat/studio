@@ -61,3 +61,10 @@ export async function requireInternalAdmin(): Promise<void> {
   const gate = await getInternalAdminGate();
   if (gate !== "admin") throw new Error("Not allowed");
 }
+
+/** The account's market-naming choice; everyone starts on simple names. */
+export async function getMarketNames(): Promise<"simple" | "pairs"> {
+  if (!isAuthConfigured()) return "simple";
+  const user = await currentUser();
+  return readStudioMeta(user?.unsafeMetadata).marketNames ?? "simple";
+}

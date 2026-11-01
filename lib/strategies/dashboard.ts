@@ -18,7 +18,7 @@ export interface StrategyRowView {
   name: string;
   symbol: string;
   rule: string;
-  status: "backtest" | "paper" | "live";
+  status: "backtest" | "paper" | "live" | "blown out";
   returnPct: number | null;
   maxDrawdownPct: number | null;
   /** "Long since 12 Oct 2026" or null. */
@@ -29,6 +29,7 @@ export interface StrategyRowView {
 }
 
 export interface DashboardData extends MarketsBundle {
+  names: "simple" | "pairs";
   rows: StrategyRowView[];
   activity: ActivityEvent[];
   nextCheckAt: number;
@@ -43,8 +44,8 @@ function day(ms: number): string {
   return `${d.getUTCDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-export async function loadDashboard(userId: string | null, admin: boolean): Promise<DashboardData> {
-  const bundle = await loadMarkets();
+export async function loadDashboard(userId: string | null, admin: boolean, names: "simple" | "pairs" = "simple"): Promise<DashboardData> {
+  const bundle = { ...(await loadMarkets()), names };
   const nextCheckAt = Math.ceil(Date.now() / DAY_MS) * DAY_MS;
   const storage = storageConfigured();
   if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage, paper: null };
@@ -67,9 +68,10 @@ export async function loadDashboard(userId: string | null, admin: boolean): Prom
       name: s.name,
       symbol: s.symbol,
       rule: describeEntry(s.spec.entry),
-      status: s.status === "draft" ? "backtest" : s.status,
-      returnPct: r ? r.strategy.returnPct : null,
-      maxDrawdownPct: r ? r.strategy.maxDrawdownPct : null,
+      status: s.blownOutAt ? "blown out" : s.status === "draft" ? "backtest" : s.status,
+      // Stored results from before the blow-out stop can exceed −100%; the floor applies on display too.
+      returnPct: r ? Math.max(-100, r.strategy.returnPct) : null,
+      maxDrawdownPct: r ? Math.min(100, r.strategy.maxDrawdownPct) : null,
       openPosition:
         s.status === "paper" || openByStrategy.has(s.id)
           ? (() => {

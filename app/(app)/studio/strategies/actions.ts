@@ -132,7 +132,7 @@ export async function paperStateAction(id: string): Promise<Result<{ paper: Pape
     const ownerId = await owner();
     const row = await getStrategy(z.string().uuid().parse(id), ownerId);
     if (!row) return { ok: false, error: "Not found" };
-    return { ok: true, paper: await loadPaperForStrategy(ownerId, row.id, row.status, row.paperSince) };
+    return { ok: true, paper: await loadPaperForStrategy(ownerId, row.id, row.status, row.paperSince, row.blownOutAt) };
   } catch (error) {
     return fail(error);
   }
@@ -157,7 +157,7 @@ export async function setPaperStatusAction(id: string, status: "paper" | "draft"
       note = `Paper trading stopped. ${stopped.note}`;
     }
     const fresh = await getStrategy(row.id, ownerId);
-    const paper = await loadPaperForStrategy(ownerId, row.id, fresh?.status ?? status, fresh?.paperSince ?? null);
+    const paper = await loadPaperForStrategy(ownerId, row.id, fresh?.status ?? status, fresh?.paperSince ?? null, fresh?.blownOutAt ?? null);
     return { ok: true, paper, note };
   } catch (error) {
     return fail(error);

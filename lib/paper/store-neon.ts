@@ -91,6 +91,7 @@ export const neonPaperStore: PaperStore = {
       status: r.status as PaperStrategy["status"],
       spec: StrategySpecSchema.parse(r.spec),
       paperSince: r.paper_since ? ms(r.paper_since) : null,
+      blownOutAt: r.blown_out_at ? ms(r.blown_out_at) : null,
     }));
   },
 
@@ -197,6 +198,22 @@ export const neonPaperStore: PaperStore = {
         set realised_pnl_usd = excluded.realised_pnl_usd, fees_usd = excluded.fees_usd, trades = excluded.trades, updated_at = now()`;
   },
 
+  async realisedSince(strategyId, sinceMs) {
+    const sql = sqlOrThrow();
+    const rows = await sql`
+      select coalesce(sum(realised_pnl_usd), 0) as pnl from studio.paper_positions
+      where strategy_id = ${strategyId} and closed_at is not null and opened_at >= ${new Date(sinceMs).toISOString()}`;
+    return num(rows[0]?.pnl);
+  },
+
+  async markBlownOut(strategyId, nowMs) {
+    const sql = sqlOrThrow();
+    await sql`
+      update studio.strategies
+      set status = 'draft', spec = jsonb_set(spec, '{status}', '"draft"'), blown_out_at = ${new Date(nowMs).toISOString()}, updated_at = now()
+      where id = ${strategyId}`;
+  },
+
   async availableCollateral(ownerId) {
     const sql = sqlOrThrow();
     const rows = await sql`
@@ -252,7 +269,7 @@ export async function setStrategyStatus(ownerId: string, id: string, status: "pa
     status === "paper"
       ? await sql`
           update studio.strategies
-          set status = 'paper', spec = jsonb_set(spec, '{status}', '"paper"'), paper_since = now(), updated_at = now()
+          set status = 'paper', spec = jsonb_set(spec, '{status}', '"paper"'), paper_since = now(), blown_out_at = null, updated_at = now()
           where id = ${id} and owner_id = ${ownerId} and status = ${from}
           returning id`
       : await sql`

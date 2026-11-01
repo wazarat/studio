@@ -3,6 +3,7 @@
 import { useLivePrices } from "@/components/studio/useLivePrices";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/venues/format";
+import { marketLabel, type MarketNames } from "@/lib/venues/names";
 import type { Market, Price } from "@/lib/venues/types";
 
 /**
@@ -12,7 +13,7 @@ import type { Market, Price } from "@/lib/venues/types";
  */
 const HEADLINE = ["BTC/USD", "ETH/USD", "XAU/USD", "NVDA/USD", "EUR/USD", "US500/USD"];
 
-export function MarketsPreview({ markets, prices, changes, live }: { markets: Market[]; prices: Price[]; changes: Record<string, number>; live: boolean }) {
+export function MarketsPreview({ markets, prices, changes, live, names }: { markets: Market[]; prices: Price[]; changes: Record<string, number>; live: boolean; names: MarketNames }) {
   const stream = useLivePrices(prices, live);
   const rows = HEADLINE.map((s) => markets.find((m) => m.symbol === s)).filter((m): m is Market => Boolean(m));
   return (
@@ -23,9 +24,9 @@ export function MarketsPreview({ markets, prices, changes, live }: { markets: Ma
         const open = p?.isOpen ?? m.hours.isOpen;
         return (
           <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-            <span>
-              <span className={cn("font-medium", open ? "text-ink-100" : "text-ink-400")}>{m.symbol}</span>
-              <span className="ml-2 text-ink-500">{open ? "Open" : "Closed"}</span>
+            <span className="min-w-0">
+              <span className={cn("font-medium", open ? "text-ink-100" : "text-ink-400")}>{marketLabel(m, names).primary}</span>
+              <span className="ml-2 text-ink-500">{open ? "Open" : "Closed"} · perp</span>
             </span>
             <span className="tabular-nums">
               <span className="text-ink-200">{p ? formatPrice(p.mid) : "–"}</span>

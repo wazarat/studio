@@ -6,7 +6,7 @@ import { Dashboard } from "@/components/studio/Dashboard";
 import { StudioOnboarding } from "@/components/studio/StudioOnboarding";
 import { Card, CardSection } from "@/components/ui/Card";
 import { STUDIO_COPY } from "@/content/studio";
-import { getInternalAdminGate, getOnboardingGate } from "@/lib/auth";
+import { getInternalAdminGate, getMarketNames, getOnboardingGate } from "@/lib/auth";
 import { STUDIO_PATH, loginPathFor } from "@/lib/auth-paths";
 import { loadDashboard } from "@/lib/strategies/dashboard";
 
@@ -40,7 +40,7 @@ export default async function StudioPage() {
 
   const admin = (await getInternalAdminGate()) === "admin";
   const { userId } = await auth();
-  const data = await loadDashboard(userId, admin);
+  const data = await loadDashboard(userId, admin, await getMarketNames());
 
   return (
     <>

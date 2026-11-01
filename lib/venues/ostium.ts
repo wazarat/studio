@@ -66,11 +66,31 @@ function rpcUrl(): string | undefined {
   return process.env.OSTIUM_RPC_URL?.trim() || undefined;
 }
 
-let readClientPromise: Promise<OstiumClient> | null = null;
+/**
+ * Two read clients (step 5b). Market data (pairs, prices, candles, fees,
+ * rollover, previews) always comes from Arbitrum One, so backtests, paper
+ * trading and the cost model see the real venue. Only what belongs to a
+ * trader (positions, fills, balances, orders) and every built or signed
+ * transaction follow OSTIUM_TESTNET.
+ */
+let dataClientPromise: Promise<OstiumClient> | null = null;
+let traderClientPromise: Promise<OstiumClient> | null = null;
 
-function readClient(): Promise<OstiumClient> {
-  readClientPromise ??= OstiumClient.createReadOnly({ testnet: isTestnet(), rpcUrl: rpcUrl() });
-  return readClientPromise;
+function dataClient(): Promise<OstiumClient> {
+  dataClientPromise ??= OstiumClient.createReadOnly({ testnet: false, rpcUrl: process.env.ARBITRUM_ONE_RPC_URL?.trim() || undefined });
+  return dataClientPromise;
+}
+
+function traderClient(): Promise<OstiumClient> {
+  if (!isTestnet()) return dataClient();
+  traderClientPromise ??= OstiumClient.createReadOnly({ testnet: true, rpcUrl: rpcUrl() });
+  return traderClientPromise;
+}
+
+/** Where market data comes from, for labels. */
+export const DATA_NETWORK = "Arbitrum One";
+export function tradingNetwork(): string {
+  return isTestnet() ? "Arbitrum Sepolia" : "Arbitrum One";
 }
 
 /** Build-only client for one trader: no key, no signing, just calldata. */
@@ -152,7 +172,7 @@ function toMarket(pair: Pair, at: number): Market {
 }
 
 async function loadPairs(): Promise<PairsCache> {
-  const client = await readClient();
+  const client = await dataClient();
   const { pairs } = await wrapSdk(() => client.getPairs());
   const at = Date.now();
   const list = pairs.map((p) => toMarket(p, at)).sort((a, b) => Number(a.id) - Number(b.id));
@@ -263,7 +283,7 @@ async function markets(): Promise<Market[]> {
 }
 
 async function prices(marketIds?: string[]): Promise<Price[]> {
-  const [client, cache] = await Promise.all([readClient(), pairs()]);
+  const [client, cache] = await Promise.all([dataClient(), pairs()]);
   const { prices: all } = await wrapSdk(() => client.getAllPrices());
   const at = Date.now();
   const wanted = marketIds ? new Set(marketIds) : null;
@@ -292,7 +312,7 @@ function subscribePrices(marketIds: string[], onPrice: (price: Price) => void): 
   void (async () => {
     // Pairs first so the stream can resolve pair ids; the SDK's own cache
     // fills from the same getPairs call.
-    const [client, cache] = await Promise.all([readClient(), pairs()]);
+    const [client, cache] = await Promise.all([dataClient(), pairs()]);
     if (stopped) return;
     const stream = client.streamPrices(marketIds);
     const offTick = stream.onTick((tick) => {
@@ -331,13 +351,13 @@ async function candles(
   fromMs: number,
   toMs?: number,
 ): Promise<Candle[]> {
-  const client = await readClient();
+  const client = await dataClient();
   const rows = await wrapSdk(() => client.getCandles({ pairId: marketId, from: fromMs, to: toMs, resolution }));
   return rows.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
 }
 
 async function positions(trader: Hex): Promise<Position[]> {
-  const [client, cache] = await Promise.all([readClient(), pairs()]);
+  const [client, cache] = await Promise.all([traderClient(), pairs()]);
   const { pairPositions } = await wrapSdk(() => client.getOpenPositions({ user: trader }));
   return pairPositions.map(({ position }) => toPosition(position, cache.byId.get(String(position.pairId))));
 }
@@ -347,7 +367,7 @@ async function previewOpen(intent: OpenIntent): Promise<PreviewResult> {
   if (!market.hours.isOpen) {
     throw new VenueError("market-closed", `${market.symbol} is closed on Ostium right now`);
   }
-  const client = await readClient();
+  const client = await dataClient();
   const isLong = intent.side === "long";
   const [preview, maxCollateral] = await wrapSdk(() =>
     Promise.all([
@@ -517,7 +537,7 @@ function toFillRow(f: Fill, byId: Map<string, Market>): FillRow {
 }
 
 export async function getFills(trader: Hex, limit = 50): Promise<FillRow[]> {
-  const [client, cache] = await Promise.all([readClient(), pairs()]);
+  const [client, cache] = await Promise.all([traderClient(), pairs()]);
   const fills = await wrapSdk(() => client.getFills({ user: trader, limit }));
   return fills.map((f) => toFillRow(f, cache.byId)).sort((a, b) => b.at - a.at);
 }
@@ -532,7 +552,7 @@ export interface OrderStatus {
 }
 
 export async function findOrdersByTxHash(hash: Hex): Promise<OrderStatus[]> {
-  const client = await readClient();
+  const client = await traderClient();
   const orders: Order[] = await wrapSdk(() => client.getOrders({ initiatedTxHashes: [hash] }));
   return orders.map((o) => ({
     hash,
@@ -561,7 +581,7 @@ export async function getRolloverHistory(
   toMs: number = Date.now(),
   intervalMs = 60 * 60 * 1000,
 ): Promise<RolloverPoint[]> {
-  const client = await readClient();
+  const client = await dataClient();
   const points = await wrapSdk(() =>
     client.getRolloverHistory({ pairId: marketId, from: fromMs, to: toMs, intervalMs }),
   );
@@ -587,7 +607,7 @@ export interface WalletBalances {
 }
 
 export async function getBalances(trader: Hex): Promise<WalletBalances> {
-  const client = await readClient();
+  const client = await traderClient();
   const b = await wrapSdk(() => client.getBalances(trader));
   return { usdc: num(b.usdc), eth: num(b.eth), allowanceUsdc: num(b.allowance) };
 }
@@ -599,7 +619,7 @@ const CHANGES_TTL_MS = 60_000;
 export async function getPriceChanges24h(): Promise<Map<string, number>> {
   if (changesCache && Date.now() - changesCache.at < CHANGES_TTL_MS) return changesCache.byId;
   try {
-    const client = await readClient();
+    const client = await dataClient();
     const rows = await client.getPriceChanges24h();
     const byId = new Map(rows.map((r) => [String(r.pairId), r.changePct]));
     changesCache = { at: Date.now(), byId };

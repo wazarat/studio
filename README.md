@@ -93,6 +93,22 @@ through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
   change re-runs the engine in the browser; Save runs it on the server and
   stores the result. Allowlist only while this is internal.
 
+## Step 5 and 5b: paper trading and fixes
+
+- Paper trading on live Ostium prices with the same engine, checker and
+  cost model: `lib/paper/` (pure engine and runner, a Neon store, a memory
+  store for tests), a tick endpoint at `/api/internal/paper/tick` that
+  Vercel's cron calls every five minutes with `CRON_SECRET`, and Start and
+  Stop in the workspace. Each run is keyed by strategy and candle date.
+- Backtests and paper stop when equity falls below Ostium's $5 minimum
+  collateral: the strategy is labelled blown out and returns stop at −100%.
+- Market data (pairs, prices, candles, fees, rollover) always comes from
+  Arbitrum One; `OSTIUM_TESTNET` only decides where trades are built and
+  signed.
+- Market names: a toggle at the top of the markets list between simple
+  names (NVDA · NVIDIA, Gold, S&P 500) and Ostium pair symbols, saved on
+  the Clerk user. Every market is a synthetic perpetual.
+
 ## Run
 
 ```bash

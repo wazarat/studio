@@ -9,6 +9,7 @@ import type { DashboardData } from "@/lib/strategies/dashboard";
 import { TEMPLATES } from "@/lib/strategies/templates";
 import { cn } from "@/lib/utils";
 import { formatAgo, formatUsd } from "@/lib/venues/format";
+import { marketShort } from "@/lib/venues/names";
 
 /**
  * The Studio home as a trader's dashboard (Studio step 4b): the account
@@ -123,8 +124,8 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
                       </Link>
                       <span className="ml-2 text-ink-500">{r.rule}</span>
                     </td>
-                    <td className={TD}>{r.symbol}</td>
-                    <td className={cn(TD, r.status === "paper" && "text-signal-400")}>{r.status}</td>
+                    <td className={TD}>{(() => { const m = data.markets.find((x) => x.symbol === r.symbol); return m ? marketShort(m, data.names) : r.symbol; })()}</td>
+                    <td className={cn(TD, r.status === "paper" && "text-signal-400", r.status === "blown out" && "text-rose-400")}>{r.status}</td>
                     <td className={cn(TD, "text-right tabular-nums text-ink-100")}>{r.returnPct === null ? "–" : pct(r.returnPct)}</td>
                     <td className={cn(TD, "text-right tabular-nums")}>{r.maxDrawdownPct === null ? "–" : `${r.maxDrawdownPct.toFixed(1)}%`}</td>
                     <td className={TD}>{r.openPosition ?? "None"}</td>
@@ -196,7 +197,7 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
             <h2 className="font-display text-lg font-semibold text-ink-50">{STUDIO_COPY.markets.title}</h2>
             <span className="text-xs text-ink-500">Read {formatAgo(data.at, now)}</span>
           </div>
-          <MarketsPreview markets={data.markets} prices={data.prices} changes={data.changes} live={admin} />
+          <MarketsPreview markets={data.markets} prices={data.prices} changes={data.changes} live={admin} names={data.names} />
           {hasRows && admin ? (
             <ul className="space-y-1 text-xs">
               {TEMPLATES.map((t) => (

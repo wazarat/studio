@@ -22,6 +22,7 @@ export interface StrategyRow {
   spec: StrategySpec;
   /** ms epoch when paper trading started; null when never started. */
   paperSince: number | null;
+  blownOutAt: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +58,7 @@ function toStrategy(r: Record<string, unknown>): StrategyRow {
     tier: r.tier as StrategySpec["tier"],
     spec: StrategySpecSchema.parse(r.spec),
     paperSince: r.paper_since ? new Date(r.paper_since as string).getTime() : null,
+    blownOutAt: r.blown_out_at ? new Date(r.blown_out_at as string).getTime() : null,
     createdAt: new Date(r.created_at as string).toISOString(),
     updatedAt: new Date(r.updated_at as string).toISOString(),
   };

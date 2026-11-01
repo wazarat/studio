@@ -10,6 +10,8 @@ import { RulePanel } from "@/components/studio/RulePanel";
 import { ResultsTabs } from "@/components/studio/ResultsTabs";
 import { useDebouncedValue } from "@/components/studio/useDebouncedValue";
 import { useLivePrices } from "@/components/studio/useLivePrices";
+import { useMarketNames } from "@/components/studio/useMarketNames";
+import { PERP_NOTE, marketLabel, marketShort, type MarketNames } from "@/lib/venues/names";
 import { inputClasses } from "@/components/ui/Input";
 import { paperMarkersFor } from "@/lib/paper/activity";
 import { unrealised } from "@/lib/paper/engine";
@@ -38,6 +40,7 @@ export interface WorkspaceProps {
   initialCandles: Candle[] | null;
   savedSpec: StrategySpec | null;
   initialPaper: PaperForStrategy | null;
+  initialNames: MarketNames;
 }
 
 const DAY_MS = 86_400_000;
@@ -52,6 +55,7 @@ export function Workspace(props: WorkspaceProps) {
   const [paperNote, setPaperNote] = useState<string | null>(null);
   const [toggling, startToggle] = useTransition();
   const live = useLivePrices(props.prices, true);
+  const [names, setNames] = useMarketNames(props.initialNames);
   const now = useNow();
 
   const marketsById = useMemo(() => new Map(markets.map((m) => [m.id, m])), [markets]);
@@ -247,7 +251,15 @@ export function Workspace(props: WorkspaceProps) {
   return (
     <div className="grid grid-cols-1 border-t border-ink-700/40 lg:min-h-[calc(100vh-4rem)] lg:grid-cols-[15rem_minmax(0,1fr)_21rem]">
       <aside className="hidden border-r border-ink-700/40 lg:sticky lg:top-16 lg:block lg:h-[calc(100vh-4rem)]">
-        <MarketsRail markets={markets} prices={live.prices} changes={changes} selectedId={market.id} onSelect={(id) => dispatch({ type: "market", marketId: id, leverageCap: leverageCap(marketsById.get(id) ?? market, draft.tier).cap })} />
+        <MarketsRail
+          markets={markets}
+          prices={live.prices}
+          changes={changes}
+          selectedId={market.id}
+          onSelect={(id) => dispatch({ type: "market", marketId: id, leverageCap: leverageCap(marketsById.get(id) ?? market, draft.tier).cap })}
+          names={names}
+          onNames={setNames}
+        />
       </aside>
 
       <section className="min-w-0">
@@ -261,11 +273,17 @@ export function Workspace(props: WorkspaceProps) {
             >
               {markets.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.symbol}
+                  {marketLabel(m, names).primary}
                 </option>
               ))}
             </select>
-            <h1 className="hidden font-display text-xl font-semibold text-ink-50 lg:block">{market.symbol}</h1>
+            <h1 className="hidden font-display text-xl font-semibold text-ink-50 lg:block">
+              {marketLabel(market, names).primary}
+              {marketLabel(market, names).secondary ? <span className="ml-2 text-sm font-normal text-ink-400">{market.symbol}</span> : null}
+            </h1>
+            <span className="rounded-md border border-ink-700/60 bg-ink-800/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-400" title={PERP_NOTE}>
+              perp
+            </span>
             <span className="text-lg tabular-nums text-ink-100">{mid ? formatPrice(mid) : "–"}</span>
             <span className={cn("text-xs tabular-nums", change === undefined ? "text-ink-500" : change < 0 ? "text-rose-400" : "text-ink-400")}>
               {change === undefined ? "" : `${change >= 0 ? "+" : "−"}${Math.abs(change).toFixed(2)}% today`}
@@ -276,7 +294,8 @@ export function Workspace(props: WorkspaceProps) {
             {live.state === "live" && live.lastTickAt ? `Live · ${formatAgo(live.lastTickAt, now)}` : live.state === "retrying" ? "Reconnecting" : "Connecting"} · next check at daily close, {formatCountdown(nextClose - now)}
           </p>
         </div>
-        {!open ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{market.symbol} is closed right now. You can design and save; the checker refuses an open until it reopens.</p> : null}
+        <p className="border-b border-ink-700/40 px-4 py-1.5 text-[11px] text-ink-500">{PERP_NOTE}</p>
+        {!open ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{marketShort(market, names)} is closed right now. You can design and save; the checker refuses an open until it reopens.</p> : null}
         {savedNote ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{savedNote}</p> : null}
         {paper?.open ? (
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-ink-700/40 px-4 py-2 text-xs">
@@ -322,7 +341,7 @@ export function Workspace(props: WorkspaceProps) {
           saveError={saveError}
           saveRefusals={saveRefusals}
           onSave={onSave}
-          paper={{ status: paper?.status ?? draft.status, since: paper?.since ?? null }}
+          paper={{ status: paper?.status ?? draft.status, since: paper?.since ?? null, blownOutAt: paper?.blownOutAt ?? null }}
           onStart={() => togglePaper("paper")}
           onStop={() => togglePaper("draft")}
           toggling={toggling}

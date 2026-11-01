@@ -326,7 +326,7 @@ export function OstiumConsole({ testnet, builderAddress, toleranceBps, devSigner
           <p className="kicker">Internal</p>
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink-50 md:text-4xl">Ostium</h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-400">
-            {testnet ? "Arbitrum Sepolia" : "Arbitrum One"} · {markets.length} markets, {openCount} open ·{" "}
+            Market data from Arbitrum One · trades {testnet ? "on Arbitrum Sepolia (testnet)" : "on Arbitrum One"} · {markets.length} markets, {openCount} open ·{" "}
             {feedCount} with a Chainlink feed, ±{toleranceBps} bps band ·{" "}
             {builderAddress ? `builder ${short(builderAddress)}, fee 0` : "no builder address set"}
           </p>

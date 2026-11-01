@@ -102,6 +102,17 @@ export class MemoryPaperStore implements PaperStore {
     // Derived from positions on read in this store.
   }
 
+  async realisedSince(strategyId: string, sinceMs: number) {
+    return Array.from(this.positions.values())
+      .filter((p) => p.strategyId === strategyId && p.closedAt !== null && p.openedAt >= sinceMs)
+      .reduce((s, p) => s + (p.realisedPnlUsd ?? 0), 0);
+  }
+
+  async markBlownOut(strategyId: string, nowMs: number) {
+    const s = this.strategies.get(strategyId);
+    if (s) this.strategies.set(strategyId, { ...s, status: "draft", blownOutAt: nowMs });
+  }
+
   async availableCollateral(ownerId: string) {
     const starting = this.startingBalance.get(ownerId) ?? 10_000;
     const mine = Array.from(this.positions.values()).filter((p) => p.ownerId === ownerId);

@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 import { historyWindow, verdict } from "@/lib/strategies/verdict";
 
 const sum = (returnPct: number, maxDrawdownPct: number) =>
-  ({ returnPct, maxDrawdownPct, maxDrawdownUsd: 0, trades: 0, winRatePct: 0, feesUsd: 0, openingFeesUsd: 0, rolloverUsd: 0, netPnlUsd: 0, finalEquityUsd: 0 });
+  ({ blownOutAt: null, returnPct, maxDrawdownPct, maxDrawdownUsd: 0, trades: 0, winRatePct: 0, feesUsd: 0, openingFeesUsd: 0, rolloverUsd: 0, netPnlUsd: 0, finalEquityUsd: 0 });
 
 describe("verdict", () => {
+  it("names a blow-out first", () => {
+    expect(verdict({ strategy: { ...sum(-100, 100), blownOutAt: Date.UTC(2025, 2, 3) }, buyAndHold: { ...sum(10, 5), trade: null } })).toBe(
+      "Blown out on 3 Mar 2025: equity fell below the venue's $5 minimum collateral and trading stopped.",
+    );
+  });
+
   it("says trailed or beat in points, and the drawdown difference", () => {
     expect(verdict({ strategy: sum(135.8, 33.0), buyAndHold: { ...sum(238.8, 54.6), trade: null } })).toBe("Trailed buy and hold by 103 points with 22 points less drawdown.");
     expect(verdict({ strategy: sum(50, 40), buyAndHold: { ...sum(38, 20), trade: null } })).toBe("Beat buy and hold by 12 points with 20 points more drawdown.");

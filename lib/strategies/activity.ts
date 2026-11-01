@@ -28,6 +28,7 @@ const REASON: Record<string, string> = {
   "stop-loss": "at stop loss",
   liquidation: "liquidated",
   end: "at the end of history",
+  "blown-out": "blown out",
 };
 
 export function activityFromBacktests(

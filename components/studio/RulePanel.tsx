@@ -56,7 +56,7 @@ export interface RulePanelProps {
   saveError: string | null;
   saveRefusals: RiskFinding[];
   onSave: () => void;
-  paper: { status: "draft" | "paper" | "live"; since: number | null };
+  paper: { status: "draft" | "paper" | "live"; since: number | null; blownOutAt: number | null };
   onStart: () => void;
   onStop: () => void;
   toggling: boolean;
@@ -77,6 +77,14 @@ export function RulePanel(p: RulePanelProps) {
   const canStart = Boolean(draft.id) && !p.dirty && Object.keys(issues).length === 0 && !blocking && p.paper.status === "draft" && !p.toggling;
   const entry = draft.entry;
   const notional = draft.size.collateralUsd * draft.size.leverage;
+  const roundTripUsd = costs.openFee + 2 * costs.oracleFee;
+  const roundTripPct = notional > 0 ? (roundTripUsd / notional) * 100 : 0;
+  const level = (pct: number | undefined, sign: 1 | -1) => {
+    if (!pct || !p.mid) return null;
+    const price = p.mid * (1 + (sign * pct) / 100);
+    const usd = (sign * notional * pct) / 100;
+    return `${formatPrice(price)} · ${usd >= 0 ? "+" : "−"}${formatUsd(Math.abs(usd))}`;
+  };
   const capLabel =
     cap.bound === "tier"
       ? `${draft.tier === "studio" ? "Studio" : "Studio+"} limit`
@@ -129,12 +137,12 @@ export function RulePanel(p: RulePanelProps) {
           </Field>
         )}
         <Problem text={issues["entry.fast"] ?? issues["entry.slow"] ?? issues["entry.period"] ?? issues["entry.buyBelow"] ?? issues["entry.lookback"] ?? issues.entry} />
-        <p className="text-xs text-ink-500">Exits on the opposite signal, or at the levels below.</p>
+        <p className="text-xs text-ink-500">Exits on the opposite signal, or at the levels below, as a percent of the entry price.</p>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Take profit, %">
+          <Field label="Take profit, % of price" hint={level(draft.exit.takeProfitPct, 1) ?? "At today's price"}>
             <Input inputMode="decimal" value={draft.exit.takeProfitPct ?? ""} onChange={(e) => dispatch({ type: "exit", patch: { takeProfitPct: optional(e.target.value) } })} placeholder="off" />
           </Field>
-          <Field label="Stop loss, %">
+          <Field label="Stop loss, % of price" hint={level(draft.exit.stopLossPct, -1) ?? "At today's price"}>
             <Input inputMode="decimal" value={draft.exit.stopLossPct ?? ""} onChange={(e) => dispatch({ type: "exit", patch: { stopLossPct: optional(e.target.value) } })} placeholder="off" />
           </Field>
         </div>
@@ -173,8 +181,13 @@ export function RulePanel(p: RulePanelProps) {
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-ink-500">Fees per round trip</dt>
-            <dd className="tabular-nums text-ink-100">{formatUsd(costs.openFee + 2 * costs.oracleFee, 2)}</dd>
+            <dd className={cn("tabular-nums", roundTripPct > 0.25 ? "text-rose-400" : "text-ink-100")}>
+              {formatUsd(roundTripUsd, 2)} · {roundTripPct.toFixed(2)}% of position
+            </dd>
           </div>
+          {roundTripPct > 0.25 ? (
+            <div className="text-rose-400">Fees above 0.25% of the position: the flat oracle fee weighs heavily on a trade this small. A larger size brings it down.</div>
+          ) : null}
           <div className="flex justify-between gap-3">
             <dt className="text-ink-500">Rollover per day</dt>
             <dd className="tabular-nums text-ink-100">
@@ -224,7 +237,9 @@ export function RulePanel(p: RulePanelProps) {
           </>
         )}
         <p className="text-center text-[11px] text-ink-500">
-          {onPaper
+          {p.paper.blownOutAt
+            ? `Blown out on ${new Date(p.paper.blownOutAt).toISOString().slice(0, 10)}: equity fell below Ostium's $5 minimum. Save a change and start again.`
+            : onPaper
             ? `Paper since ${p.paper.since ? new Date(p.paper.since).toISOString().slice(0, 10) : "today"} · stop to edit`
             : p.dirty
               ? "Unsaved changes · save before starting paper trading"

@@ -205,6 +205,26 @@ describe("runTick", () => {
     expect(Array.from(w.store.positions.values())[0].rolloverUsd).toBeCloseTo(before);
   });
 
+  it("blows out a strategy whose paper equity falls under the minimum collateral", async () => {
+    const w = world([strategy()], [10, 10, 10, 11]);
+    await runTick(w.deps, at(4, 0.05));
+    w.price = { ...w.price, bid: 5.4, mid: 5.5, ask: 5.6 }; // liquidation: −$100.70 on $100 of collateral
+    await runTick(w.deps, at(4, 9));
+    w.candles = bars([10, 10, 10, 11, 12]); // a new breakout the strategy must not take
+    w.price = { ...w.price, bid: 12.0, mid: 12.1, ask: 12.2 };
+    const r = await runTick(w.deps, at(5, 0.05));
+    expect(r.entries).toBe(0);
+    expect(r.refusals).toBe(1);
+    expect(w.store.strategies.get("s1")?.status).toBe("draft");
+    expect(w.store.strategies.get("s1")?.blownOutAt).toBe(at(5, 0.05));
+    const refusal = w.store.activity.find((a) => a.kind === "refusal")!;
+    expect((refusal.meta as { codes: string[] }).codes).toEqual(["blown-out"]);
+    expect(w.store.runs.get(`s1:${utcDate(day(4))}`)?.note).toBe("blown-out");
+    // Another tick does nothing: the strategy is off paper.
+    const r2 = await runTick(w.deps, at(5, 0.5));
+    expect(r2.runs).toBe(0);
+  });
+
   it("refuses an entry the paper balance cannot cover", async () => {
     const big = { size: { collateralUsd: 6_000, leverage: 1 }, caps: { maxPositionUsd: 10_000, dailyLossLimitUsd: 0 } };
     const w = world([strategy({ id: "a", spec: big }), strategy({ id: "b", spec: big })], [10, 10, 10, 11]);

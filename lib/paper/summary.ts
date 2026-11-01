@@ -48,19 +48,27 @@ export async function loadPaperSummary(ownerId: string, prices: Price[]): Promis
 export interface PaperForStrategy {
   status: "draft" | "paper" | "live";
   since: number | null;
+  blownOutAt: number | null;
   open: PaperPosition | null;
   closed: PaperPosition[];
   activity: ActivityRow[];
   realisedSinceStartUsd: number;
 }
 
-export async function loadPaperForStrategy(ownerId: string, strategyId: string, status: PaperForStrategy["status"], since: number | null): Promise<PaperForStrategy> {
+export async function loadPaperForStrategy(
+  ownerId: string,
+  strategyId: string,
+  status: PaperForStrategy["status"],
+  since: number | null,
+  blownOutAt: number | null = null,
+): Promise<PaperForStrategy> {
   const [positions, activity] = await Promise.all([paperPositionsFor(ownerId, strategyId), paperActivityFor(ownerId, strategyId, 50)]);
   const open = positions.find((p) => p.closedAt === null) ?? null;
   const closed = positions.filter((p) => p.closedAt !== null && (since === null || p.openedAt >= since));
   return {
     status,
     since,
+    blownOutAt,
     open,
     closed,
     activity,

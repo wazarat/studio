@@ -163,7 +163,43 @@ describe("runBacktest", () => {
     expect(t.pricePnlUsd).toBe(-100);
     expect(t.fees.oracleUsd).toBe(0.5);
     expect(t.netPnlUsd).toBeCloseTo(-100.7);
-    expect(r.strategy.finalEquityUsd).toBeCloseTo(-0.7);
+    // The account is blown out: equity and return stop at zero and −100%.
+    expect(r.strategy.blownOutAt).toBe(candles[4].time);
+    expect(r.strategy.finalEquityUsd).toBe(0);
+    expect(r.strategy.netPnlUsd).toBe(-100);
+    expect(r.strategy.returnPct).toBe(-100);
+  });
+
+  it("stops at a blow-out: equity under the minimum collateral ends trading at −100% at most", () => {
+    // Liquidation on the first trade, then a fresh breakout the strategy must not take.
+    const candles = bars([10, 10, 10, 11, 6, 7, 8]);
+    candles[4].low = 5;
+    const r = runBacktest({ spec: spec({ entry: { kind: "breakout", lookback: 2 } }), candles, market: market() });
+    expect(r.trades).toHaveLength(1);
+    expect(r.trades[0].exitReason).toBe("liquidation");
+    expect(r.strategy.blownOutAt).toBe(candles[4].time);
+    expect(r.strategy.returnPct).toBe(-100);
+    expect(r.strategy.maxDrawdownPct).toBe(100);
+    expect(r.strategy.finalEquityUsd).toBe(0);
+    expect(r.strategy.netPnlUsd).toBe(-100);
+    // Buy and hold is liquidated on the same bar and blows out too.
+    expect(r.buyAndHold.blownOutAt).toBe(candles[4].time);
+    expect(r.buyAndHold.returnPct).toBe(-100);
+  });
+
+  it("closes an open position with reason blown-out when the mark takes equity under the minimum", () => {
+    // A losing first trade, then a second whose mark drains what is left while the price stays above liquidation.
+    const candles = bars([10, 10, 10, 11, 9, 11.5, 7]);
+    const r = runBacktest({ spec: spec({ entry: { kind: "breakout", lookback: 2 } }), candles, market: market() });
+    expect(r.trades).toHaveLength(2);
+    expect(r.trades[0].exitReason).toBe("signal");
+    expect(r.trades[0].netPnlUsd).toBeCloseTo((200 * (9 - 11)) / 11 - 1.26);
+    expect(r.trades[1].exitReason).toBe("blown-out");
+    expect(r.trades[1].exitPrice).toBe(7);
+    expect(r.trades[1].liquidationPrice).toBeCloseTo(11.5 * 0.55);
+    expect(r.strategy.blownOutAt).toBe(candles[6].time);
+    expect(r.strategy.returnPct).toBe(-100);
+    expect(r.strategy.maxDrawdownPct).toBe(100);
   });
 
   it("a flat series makes no trades and pays no fees, while buy-and-hold still pays", () => {

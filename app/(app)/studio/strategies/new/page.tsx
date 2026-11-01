@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { Workspace } from "@/components/studio/Workspace";
-import { getInternalAdminGate } from "@/lib/auth";
+import { getInternalAdminGate, getMarketNames } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
 import { newDraft } from "@/lib/strategies/draft";
 import { cachedCandles, loadMarkets } from "@/lib/strategies/markets";
@@ -26,7 +26,7 @@ export default async function NewStrategyPage({ searchParams }: { searchParams: 
     bundle.markets[0];
   if (!market) notFound();
   const draft = newDraft(market.id, template ? { entry: template.draft.entry, exit: { ...template.draft.exit }, size: { ...template.draft.size } } : {});
-  const candles = await cachedCandles(market.id).catch(() => null);
+  const [candles, names] = await Promise.all([cachedCandles(market.id).catch(() => null), getMarketNames()]);
 
-  return <Workspace markets={bundle.markets} prices={bundle.prices} changes={bundle.changes} initialDraft={draft} initialCandles={candles} savedSpec={null} initialPaper={null} />;
+  return <Workspace markets={bundle.markets} prices={bundle.prices} changes={bundle.changes} initialDraft={draft} initialCandles={candles} savedSpec={null} initialPaper={null} initialNames={names} />;
 }

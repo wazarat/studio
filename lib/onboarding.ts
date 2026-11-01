@@ -41,6 +41,8 @@ export interface StudioMeta {
   ide?: Ide;
   /** ISO time the account finished the sign-up steps. The onboarding gate. */
   onboardedAt?: string;
+  /** Market naming in Studio (step 5b): simple names or Ostium pair symbols. */
+  marketNames?: "simple" | "pairs";
 }
 
 const ROLES = new Set<string>(ROLE_OPTIONS.map((o) => o.value));
@@ -59,6 +61,7 @@ export function readStudioMeta(unsafeMetadata: unknown): StudioMeta {
   if (typeof m.experience === "string" && EXPERIENCES.has(m.experience)) meta.experience = m.experience as Experience;
   if (typeof m.ide === "string" && IDES.has(m.ide)) meta.ide = m.ide as Ide;
   if (typeof m.onboardedAt === "string") meta.onboardedAt = m.onboardedAt;
+  if (m.marketNames === "simple" || m.marketNames === "pairs") meta.marketNames = m.marketNames;
   return meta;
 }
 

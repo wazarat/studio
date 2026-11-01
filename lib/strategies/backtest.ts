@@ -35,7 +35,10 @@ export interface BacktestInput {
   riskLimits?: Partial<RiskLimits>;
 }
 
-export type ExitReason = "signal" | "take-profit" | "stop-loss" | "liquidation" | "end";
+export type ExitReason = "signal" | "take-profit" | "stop-loss" | "liquidation" | "end" | "blown-out";
+
+/** Ostium's minimum collateral; below it nothing can be opened, so the run stops. */
+export const MIN_COLLATERAL_USD = 5;
 
 export interface TradeFees {
   openUsd: number;
@@ -81,6 +84,8 @@ export interface EquityPoint {
 }
 
 export interface BacktestSummary {
+  /** When equity fell below the venue's minimum collateral and trading stopped; null otherwise. */
+  blownOutAt: number | null;
   returnPct: number;
   maxDrawdownPct: number;
   /** Peak-to-trough on the equity curve, USD. */
@@ -152,6 +157,7 @@ interface Run {
   trades: BacktestTrade[];
   skipped: SkippedSignal[];
   equity: { equityUsd: number; unrealisedUsd: number }[];
+  blownOutAt: number | null;
 }
 
 export interface TradeCosts {
@@ -192,6 +198,7 @@ function simulate(
   let pos: OpenPosition | null = null;
   let pendingEntry = false;
   let pendingExit = false;
+  let blownOutAt: number | null = null;
 
   const close = (j: number, price: number, reason: ExitReason) => {
     const p = pos!;
@@ -271,8 +278,21 @@ function simulate(
       }
     }
 
+    // Blown out: equity under the venue's minimum collateral ends the run.
+    if (blownOutAt === null) {
+      const markUsd = pos ? (N * (c.close - pos.entryPrice)) / pos.entryPrice : 0;
+      if (ledger + markUsd < MIN_COLLATERAL_USD) {
+        blownOutAt = c.time;
+        if (pos) close(j, c.close, "blown-out");
+        pendingEntry = false;
+        pendingExit = false;
+      }
+    }
+
     // Decisions on this close.
-    if (j === n - 1) {
+    if (blownOutAt !== null) {
+      // nothing more can be opened
+    } else if (j === n - 1) {
       if (pos) close(j, c.close, "end");
     } else {
       const lossTodayUsd = trades
@@ -290,10 +310,10 @@ function simulate(
     equity.push({ equityUsd: ledger + unrealisedUsd, unrealisedUsd });
   }
 
-  return { trades, skipped: skippedOut ?? [], equity };
+  return { trades, skipped: skippedOut ?? [], equity, blownOutAt };
 }
 
-function summarise(start: number, trades: BacktestTrade[], curve: number[]): BacktestSummary {
+function summarise(start: number, trades: BacktestTrade[], curve: number[], blownOutAt: number | null): BacktestSummary {
   const netPnlUsd = trades.reduce((s, t) => s + t.netPnlUsd, 0);
   const feesUsd = trades.reduce((s, t) => s + t.fees.totalUsd, 0);
   const openingFeesUsd = trades.reduce((s, t) => s + t.fees.openUsd + t.fees.oracleUsd, 0);
@@ -308,16 +328,18 @@ function summarise(start: number, trades: BacktestTrade[], curve: number[]): Bac
   }
   const wins = trades.filter((t) => t.netPnlUsd > 0).length;
   return {
-    returnPct: (netPnlUsd / start) * 100,
-    maxDrawdownPct: maxDd * 100,
-    maxDrawdownUsd: maxDdUsd,
+    blownOutAt,
+    // A blown-out account cannot lose more than it had: return and drawdown stop at −100%.
+    returnPct: Math.max(-100, (netPnlUsd / start) * 100),
+    maxDrawdownPct: Math.min(100, maxDd * 100),
+    maxDrawdownUsd: Math.min(maxDdUsd, Math.max(start, ...curve)),
     trades: trades.length,
     winRatePct: trades.length ? (wins / trades.length) * 100 : 0,
     feesUsd,
     openingFeesUsd,
     rolloverUsd,
-    netPnlUsd,
-    finalEquityUsd: start + netPnlUsd,
+    netPnlUsd: Math.max(-start, netPnlUsd),
+    finalEquityUsd: Math.max(0, start + netPnlUsd),
   };
 }
 
@@ -403,9 +425,9 @@ export function runBacktest(input: BacktestInput): BacktestResult {
       liquidationRule: `entry × (1 − ${LIQUIDATION_LOSS_FRACTION} / leverage)`,
       fillRule: "signals on the close, fills at the next open; stop before target inside a bar",
     },
-    strategy: summarise(start, strategyRun.trades, strategyRun.equity.map((e) => e.equityUsd)),
+    strategy: summarise(start, strategyRun.trades, strategyRun.equity.map((e) => e.equityUsd), strategyRun.blownOutAt),
     buyAndHold: {
-      ...summarise(start, holdRun.trades, holdRun.equity.map((e) => e.equityUsd)),
+      ...summarise(start, holdRun.trades, holdRun.equity.map((e) => e.equityUsd), holdRun.blownOutAt),
       trade: holdRun.trades[0] ?? null,
     },
     trades: strategyRun.trades,

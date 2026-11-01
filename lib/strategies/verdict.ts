@@ -15,6 +15,10 @@ function monthYear(ms: number): string {
 const pts = (n: number) => `${Math.abs(n).toFixed(0)} point${Math.abs(n).toFixed(0) === "1" ? "" : "s"}`;
 
 export function verdict(result: Pick<BacktestResult, "strategy" | "buyAndHold">): string {
+  if (result.strategy.blownOutAt !== null) {
+    const d = new Date(result.strategy.blownOutAt);
+    return `Blown out on ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}: equity fell below the venue's $5 minimum collateral and trading stopped.`;
+  }
   const dr = result.strategy.returnPct - result.buyAndHold.returnPct;
   const dd = result.strategy.maxDrawdownPct - result.buyAndHold.maxDrawdownPct;
   const head = Math.abs(dr) < 0.5 ? "Matched buy and hold" : dr > 0 ? `Beat buy and hold by ${pts(dr)}` : `Trailed buy and hold by ${pts(dr)}`;

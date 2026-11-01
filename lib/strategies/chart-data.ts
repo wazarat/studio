@@ -80,6 +80,7 @@ const REASON: Record<string, string> = {
   "stop-loss": "stop loss",
   liquidation: "liquidated",
   end: "end",
+  "blown-out": "blown out",
 };
 
 export function markersFor(result: BacktestResult | null): ChartMarker[] {

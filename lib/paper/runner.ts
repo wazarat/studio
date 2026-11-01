@@ -1,4 +1,5 @@
-import { candleDateOf, closeNumbers, DAY_MS, decideExit, isDue, planEntry, riskFor, rolloverDue, signalOn, utcDate } from "@/lib/paper/engine";
+import { candleDateOf, closeNumbers, DAY_MS, decideExit, isDue, planEntry, riskFor, rolloverDue, signalOn, unrealised, utcDate } from "@/lib/paper/engine";
+import { MIN_COLLATERAL_USD } from "@/lib/strategies/backtest";
 import type { CloseReason, PaperPosition, PaperStrategy, TickDeps, TickReport } from "@/lib/paper/store";
 import type { Market, Price } from "@/lib/venues/types";
 
@@ -166,6 +167,30 @@ export async function runTick(deps: TickDeps, now = Date.now()): Promise<TickRep
             ctx.positions.set(s.id, pos);
           }
         }
+        // Blown out: the strategy's equity (its collateral plus what it has made or lost on paper) is under the venue's minimum.
+        const realised = await store.realisedSince(s.id, s.paperSince ?? 0);
+        const equity = s.spec.size.collateralUsd + realised + (pos ? unrealised(pos, price.mid) : 0);
+        if (equity < MIN_COLLATERAL_USD) {
+          if (pos) await closeAt(ctx, pos, price.bid, "blown-out", cd.date);
+          await store.markBlownOut(s.id, now);
+          await store.recordActivity({
+            strategyId: s.id,
+            ownerId: s.ownerId,
+            mode: "paper",
+            kind: "refusal",
+            candleDate: cd.date,
+            price: price.mid,
+            reason: `Blown out: equity of $${equity.toFixed(2)} is below Ostium's $${MIN_COLLATERAL_USD} minimum collateral. Paper trading stopped.`,
+            meta: { codes: ["blown-out"] },
+            dedupeKey: `${s.id}:blown-out`,
+            time: now,
+          });
+          await store.finishRun(s.id, cd.date, "refused", "blown-out");
+          report.refusals++;
+          say(ctx, `${s.name}: blown out at $${equity.toFixed(2)} equity`);
+          continue;
+        }
+
         const sig = signalOn(s.spec.entry, candles);
         if (sig) {
           await store.recordActivity({

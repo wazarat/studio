@@ -130,6 +130,13 @@ await sql`create index if not exists activity_strategy_time_idx on studio.activi
 await sql`create index if not exists activity_owner_time_idx on studio.activity (owner_id, time desc)`;
 await sql`create unique index if not exists activity_dedupe_idx on studio.activity (strategy_id, dedupe_key) where dedupe_key is not null`;
 
+// Step 5b: blow-out stop.
+await sql`alter table studio.strategies add column if not exists blown_out_at timestamptz`;
+await sql`alter table studio.paper_positions drop constraint if exists paper_positions_close_reason_check`;
+await sql`alter table studio.paper_positions add constraint paper_positions_close_reason_check
+  check (close_reason in ('signal', 'take-profit', 'stop-loss', 'liquidation', 'stopped', 'blown-out'))`;
+
+
 const tables = await sql`
   select table_name from information_schema.tables
   where table_schema = 'studio' order by table_name`;

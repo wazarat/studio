@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { Workspace } from "@/components/studio/Workspace";
-import { getInternalAdminGate } from "@/lib/auth";
+import { getInternalAdminGate, getMarketNames } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
 import { loadPaperForStrategy } from "@/lib/paper/summary";
 import { getStrategy } from "@/lib/strategies/db";
@@ -25,9 +25,10 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
 
   const bundle = await loadMarkets();
   if (!bundle.markets.some((m) => m.id === row.spec.market.marketId)) notFound();
-  const [candles, paper] = await Promise.all([
+  const [candles, paper, names] = await Promise.all([
     cachedCandles(row.spec.market.marketId).catch(() => null),
-    loadPaperForStrategy(row.ownerId, row.id, row.status, row.paperSince),
+    loadPaperForStrategy(row.ownerId, row.id, row.status, row.paperSince, row.blownOutAt),
+    getMarketNames(),
   ]);
 
   return (
@@ -39,6 +40,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
       initialCandles={candles}
       savedSpec={row.spec}
       initialPaper={paper}
+      initialNames={names}
     />
   );
 }

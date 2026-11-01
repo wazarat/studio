@@ -11,7 +11,7 @@ import type { Candle, Market, Price } from "@/lib/venues/types";
  * say whether they won.
  */
 
-export type CloseReason = "signal" | "take-profit" | "stop-loss" | "liquidation" | "stopped";
+export type CloseReason = "signal" | "take-profit" | "stop-loss" | "liquidation" | "stopped" | "blown-out";
 export type RunOutcome = "hold" | "entered" | "exited" | "refused";
 export type ActivityKind = "signal" | "fill" | "refusal" | "close" | "skip";
 
@@ -25,6 +25,8 @@ export interface PaperStrategy {
   spec: StrategySpec;
   /** ms epoch when paper trading started; null when never started. */
   paperSince: number | null;
+  /** Set when equity fell below the venue's minimum collateral on paper. */
+  blownOutAt?: number | null;
 }
 
 export interface PaperPosition {
@@ -110,6 +112,10 @@ export interface PaperStore {
   upsertDailyResult(strategyId: string, day: string): Promise<void>;
   /** Starting balance plus realised, minus the collateral of open positions. */
   availableCollateral(ownerId: string): Promise<number>;
+  /** Realised PnL of this strategy's positions opened since `sinceMs`. */
+  realisedSince(strategyId: string, sinceMs: number): Promise<number>;
+  /** Marks the strategy blown out and takes it off paper. */
+  markBlownOut(strategyId: string, nowMs: number): Promise<void>;
 }
 
 export interface PriceSource {
