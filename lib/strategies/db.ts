@@ -101,6 +101,18 @@ export async function insertStrategy(ownerId: string, spec: StrategySpec): Promi
   return toStrategy(rows[0]);
 }
 
+export async function updateStrategy(ownerId: string, spec: StrategySpec): Promise<StrategyRow | null> {
+  const sql = getDb();
+  if (!sql) throw new Error("Storage not configured");
+  const rows = await sql`
+    update studio.strategies
+    set name = ${spec.name}, market_id = ${spec.market.marketId}, symbol = ${spec.market.symbol},
+        spec = ${JSON.stringify(spec)}, status = ${spec.status}, tier = ${spec.tier}, updated_at = now()
+    where id = ${spec.id} and owner_id = ${ownerId}
+    returning *`;
+  return rows[0] ? toStrategy(rows[0]) : null;
+}
+
 export async function insertBacktest(strategyId: string, inputs: BacktestInputs, results: BacktestResult): Promise<BacktestRow> {
   const sql = getDb();
   if (!sql) throw new Error("Storage not configured");

@@ -591,3 +591,20 @@ export async function getBalances(trader: Hex): Promise<WalletBalances> {
   const b = await wrapSdk(() => client.getBalances(trader));
   return { usdc: num(b.usdc), eth: num(b.eth), allowanceUsdc: num(b.allowance) };
 }
+
+let changesCache: { at: number; byId: Map<string, number> } | null = null;
+const CHANGES_TTL_MS = 60_000;
+
+/** 24-hour change in percent per market id, from the venue's price history; empty on failure. */
+export async function getPriceChanges24h(): Promise<Map<string, number>> {
+  if (changesCache && Date.now() - changesCache.at < CHANGES_TTL_MS) return changesCache.byId;
+  try {
+    const client = await readClient();
+    const rows = await client.getPriceChanges24h();
+    const byId = new Map(rows.map((r) => [String(r.pairId), r.changePct]));
+    changesCache = { at: Date.now(), byId };
+    return byId;
+  } catch {
+    return changesCache?.byId ?? new Map();
+  }
+}

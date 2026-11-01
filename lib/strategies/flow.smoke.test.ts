@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { getDb } from "@/lib/db";
 import { runBacktest } from "@/lib/strategies/backtest";
 import { completedDailyCandles, ostiumDailyCandles } from "@/lib/strategies/candles";
-import { getStrategy, insertBacktest, insertStrategy, latestBacktest, latestBacktests, listStrategies, lossTodayUsd } from "@/lib/strategies/db";
+import { getStrategy, insertBacktest, insertStrategy, latestBacktest, latestBacktests, listStrategies, lossTodayUsd, updateStrategy } from "@/lib/strategies/db";
 import { StrategySpecSchema } from "@/lib/strategies/spec";
 import { ostium } from "@/lib/venues/ostium";
 
@@ -67,6 +67,13 @@ describe.skipIf(!enabled)("strategy flow", () => {
     const listed = await listStrategies(OWNER);
     expect(listed.map((s) => s.id)).toContain(spec.id);
     expect((await latestBacktests([spec.id])).get(spec.id)?.id).toBe(stored.id);
+
+    // Edit in place: the same id, a new name and rule, owner-scoped.
+    const edited = { ...spec, name: "Smoke BTC 5/20", entry: { kind: "maCross" as const, fast: 5, slow: 20 } };
+    expect(await updateStrategy("someone-else", edited)).toBeNull();
+    const updated = await updateStrategy(OWNER, edited);
+    expect(updated?.name).toBe("Smoke BTC 5/20");
+    expect((await getStrategy(spec.id, OWNER))?.spec.entry).toEqual(edited.entry);
 
     // Rerun: a newer row becomes the latest.
     const rerun = await insertBacktest(spec.id, { spec, market, source: "ostium daily", candleCount: candles.length, windowStart: results.windowStart, windowEnd: results.windowEnd, ranAt: Date.now() }, results);

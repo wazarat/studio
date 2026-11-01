@@ -1,39 +1,32 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { StrategyForm } from "@/components/studio/StrategyForm";
+import { Workspace } from "@/components/studio/Workspace";
 import { getInternalAdminGate } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
-import { ostium } from "@/lib/venues/ostium";
+import { newDraft } from "@/lib/strategies/draft";
+import { cachedCandles, loadMarkets } from "@/lib/strategies/markets";
+import { templateById } from "@/lib/strategies/templates";
 
 export const metadata: Metadata = { title: "New strategy", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-/** The New strategy form (step 4), allowlist only; a 404 for anyone else. */
-export default async function NewStrategyPage() {
+/** The workspace for a new strategy, optionally seeded from a template. Allowlist only. */
+export default async function NewStrategyPage({ searchParams }: { searchParams: Promise<{ template?: string }> }) {
   const gate = await getInternalAdminGate();
   if (gate === "signed-out") redirect(loginPathFor("/studio/strategies/new"));
   if (gate !== "admin") notFound();
 
-  const markets = (await ostium.markets()).map((m) => ({
-    id: m.id,
-    symbol: m.symbol,
-    category: m.category,
-    maxLeverage: m.limits.maxLeverage,
-    overnightMaxLeverage: m.limits.overnightMaxLeverage,
-    openBps: m.fees.openBps,
-    isOpen: m.hours.isOpen,
-  }));
+  const { template: templateId } = await searchParams;
+  const bundle = await loadMarkets();
+  const template = templateById(templateId);
+  const market =
+    (template && (bundle.markets.find((m) => m.symbol === template.symbol) ?? bundle.markets.find((m) => m.category === template.category))) ??
+    bundle.markets.find((m) => m.symbol === "BTC/USD") ??
+    bundle.markets[0];
+  if (!market) notFound();
+  const draft = newDraft(market.id, template ? { entry: template.draft.entry, exit: { ...template.draft.exit }, size: { ...template.draft.size } } : {});
+  const candles = await cachedCandles(market.id).catch(() => null);
 
-  return (
-    <div className="container py-10 md:py-14">
-      <p className="kicker">Studio</p>
-      <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink-50 md:text-4xl">New strategy</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-400">
-        Long only, decided on each daily candle close. Saving runs the risk checker against the live market, then
-        backtests the strategy over the venue&apos;s whole daily history with fees and rollover.
-      </p>
-      <StrategyForm markets={markets} />
-    </div>
-  );
+  return <Workspace markets={bundle.markets} prices={bundle.prices} changes={bundle.changes} initialDraft={draft} initialCandles={candles} savedSpec={null} />;
 }

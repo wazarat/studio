@@ -147,11 +147,25 @@ interface Run {
   equity: { equityUsd: number; unrealisedUsd: number }[];
 }
 
-interface Costs {
+export interface TradeCosts {
   notional: number;
+  /** Opening fee on the notional, USD. */
   openFee: number;
+  /** Flat oracle fee per order, USD; an open and a close pay it once each. */
   oracleFee: number;
+  /** Rollover charged for each calendar day held, USD; negative means the trader is paid. */
   rolloverPerDay: number;
+}
+type Costs = TradeCosts;
+
+/** The step-3 cost model for one trade of `notionalUsd`, as the engine charges it. */
+export function tradeCosts(notionalUsd: number, market: Pick<MarketSnapshot, "fees" | "rollover8h">): TradeCosts {
+  return {
+    notional: notionalUsd,
+    openFee: (notionalUsd * market.fees.openBps) / 10_000,
+    oracleFee: market.fees.oracleFeeUsd,
+    rolloverPerDay: notionalUsd * (market.rollover8h.long / 100) * 3,
+  };
 }
 
 function simulate(
@@ -303,12 +317,7 @@ export function runBacktest(input: BacktestInput): BacktestResult {
     );
   }
   const N = spec.size.collateralUsd * spec.size.leverage;
-  const costs: Costs = {
-    notional: N,
-    openFee: (N * market.fees.openBps) / 10_000,
-    oracleFee: market.fees.oracleFeeUsd,
-    rolloverPerDay: N * (market.rollover8h.long / 100) * 3,
-  };
+  const costs: Costs = tradeCosts(N, market);
   const sig = signals(spec.entry, candles);
   const skipped: SkippedSignal[] = [];
   const limits: Partial<RiskLimits> = { ...input.riskLimits, maxPositionUsdPerStrategy: spec.caps.maxPositionUsd };
