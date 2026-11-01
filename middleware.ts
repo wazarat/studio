@@ -16,5 +16,5 @@ const configured = Boolean(
 export default configured ? clerkMiddleware() : (_req: NextRequest) => NextResponse.next();
 
 export const config = {
-  matcher: ["/login", "/studio/:path*"],
+  matcher: ["/login", "/studio/:path*", "/internal/:path*", "/api/internal/:path*"],
 };
