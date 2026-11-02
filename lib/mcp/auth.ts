@@ -64,16 +64,41 @@ async function isAdmin(userId: string): Promise<boolean> {
   return admin;
 }
 
+/** Clients that identify with a metadata document (CIMD) carry their name in it. */
+const KNOWN_CIMD: Record<string, string> = {
+  "https://claude.ai/oauth/claude-code-client-metadata": "Claude Code",
+  "https://vscode.dev/oauth/client-metadata.json": "VS Code",
+};
+
 async function clientName(clientId: string): Promise<string> {
   const hit = clientNameCache.get(clientId);
   if (hit && Date.now() - hit.at < 10 * CACHE_MS) return hit.name;
   let name = "an MCP client";
-  try {
-    const app = await (await clerkClient()).oauthApplications.get(clientId);
-    if (app?.name) name = app.name;
-  } catch {
-    // Dynamic clients may not be readable; the id's prefix is better than nothing.
-    name = `client ${clientId.slice(0, 8)}`;
+  if (/^https?:\/\//.test(clientId)) {
+    name = KNOWN_CIMD[clientId] ?? "";
+    if (!name) {
+      try {
+        const res = await fetch(clientId, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
+        const doc = (await res.json()) as { client_name?: string };
+        name = doc.client_name?.trim() || "";
+      } catch {
+        name = "";
+      }
+    }
+    if (!name) {
+      try {
+        name = new URL(clientId).hostname.replace(/^www\./, "");
+      } catch {
+        name = "an MCP client";
+      }
+    }
+  } else {
+    try {
+      const app = await (await clerkClient()).oauthApplications.get(clientId);
+      if (app?.name) name = app.name;
+    } catch {
+      name = `client ${clientId.slice(0, 8)}`;
+    }
   }
   clientNameCache.set(clientId, { at: Date.now(), name });
   return name;

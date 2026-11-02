@@ -109,6 +109,23 @@ through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
   names (NVDA · NVIDIA, Gold, S&P 500) and Ostium pair symbols, saved on
   the Clerk user. Every market is a synthetic perpetual.
 
+## Step 6: MCP, so an agent can design and test strategies
+
+- Two MCP servers on the official SDK's streamable HTTP transport: the
+  account server at `/mcp` (markets, candles, backtests, drafts, the feed)
+  and one per strategy at `/mcp/s/<id>` (its spec, backtest, paper results,
+  positions, proposals and paper requests). Sign-in is Clerk OAuth: enable
+  "Publish DCR support" and "Publish CIMD support" under OAuth
+  applications → Settings → Client onboarding, and set `NEXT_PUBLIC_APP_URL`
+  to the deployment so the metadata names the right resource.
+- Agents can read, backtest and propose. `propose_change` and the paper
+  requests store a pending proposal; the strategy page shows it with the
+  diff and its backtest beside the current one, and only Accept there
+  applies it. Decisions land in the feed tagged agent.
+- A Connect card on the dashboard and each strategy page gives one command
+  or link per client (Claude Code, Claude, Cursor, VS Code, Codex, ChatGPT)
+  and shows who is connected.
+
 ## Run
 
 ```bash
