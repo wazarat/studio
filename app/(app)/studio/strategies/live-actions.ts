@@ -11,7 +11,7 @@ import { neonLiveStore } from "@/lib/live/store-neon";
 import { validateTerms } from "@/lib/live/terms";
 import { loadLiveView, type LiveView } from "@/lib/live/view";
 import { liveEnabled, liveExecutor } from "@/lib/paper/tick";
-import { createSessionKey, destroySessionKey } from "@/lib/signers/kms";
+import { createSessionKeyFor, destroySessionKeyFor } from "@/lib/signers/session";
 import { getStrategy, storageConfigured } from "@/lib/strategies/db";
 import { getApproveUsdcTx, getDelegationStatus, getRemoveDelegateTx, getSetDelegateTx } from "@/lib/venues/ostium";
 import type { UnsignedTx } from "@/lib/venues/types";
@@ -87,7 +87,7 @@ export async function prepareLiveAction(
     if (!session) {
       // The session id is chosen first so the key's alias can carry it.
       const sessionId = randomUUID();
-      const key = await createSessionKey(sessionId);
+      const key = await createSessionKeyFor(sessionId);
       session = await neonLiveStore.createSession(
         { id: sessionId, ownerId, trader: traderAddr, sessionAddress: key.address, kmsKeyId: key.keyId, expiresAt: t.expiresAtMs },
         key.createdAt,
@@ -194,7 +194,7 @@ export async function stopLiveAction(id: string): Promise<Result<{ view: LiveVie
       if (rest.length === 0) {
         const session = await neonLiveStore.session(link.sessionId);
         if (session && (await neonLiveStore.setSessionStatus(session.id, "ended", ["pending", "active", "permission-ended"], now, "stopped"))) {
-          await destroySessionKey(session.kmsKeyId, session.createdAt).catch(() => undefined);
+          await destroySessionKeyFor(session.kmsKeyId, session.createdAt).catch(() => undefined);
         }
       }
       note = "Stopped. The session key is destroyed; any position still open belongs to your wallet and closes in the Ostium app.";

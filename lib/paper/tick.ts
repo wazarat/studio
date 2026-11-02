@@ -8,7 +8,7 @@ import { neonLiveStore } from "@/lib/live/store-neon";
 import { closeForStop, runTick } from "@/lib/paper/runner";
 import { neonPaperStore } from "@/lib/paper/store-neon";
 import type { LiveDeps, TickDeps, TickReport } from "@/lib/paper/store";
-import { isKmsConfigured } from "@/lib/signers/kms";
+import { sessionSignerConfigured } from "@/lib/signers/session";
 import { completedDailyCandles, ostiumDailyCandles } from "@/lib/strategies/candles";
 import { isTestnet, ostium } from "@/lib/venues/ostium";
 
@@ -18,10 +18,11 @@ import { isTestnet, ostium } from "@/lib/venues/ostium";
  * fresh (not the page cache, so the tick after midnight sees the new
  * candle), and the Chainlink reference. The cron route and the manual
  * button both call this. Live strategies (step 7) ride the same tick when
- * the venue is on testnet and AWS KMS is configured.
+ * the venue is on testnet and a session key service is configured (KMS,
+ * or the local testnet signer when SESSION_SIGNER=local).
  */
 export function liveEnabled(): boolean {
-  return isTestnet() && isKmsConfigured();
+  return isTestnet() && sessionSignerConfigured();
 }
 
 export function liveExecutor(): (LiveDeps & LiveControls) | null {

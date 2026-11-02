@@ -356,6 +356,18 @@ export function liveDeps(d: ExecutorDeps): LiveDeps & LiveControls {
 
     async reconcile(s, nowMs) {
       fresh(nowMs);
+      // The delegate is checked on every tick, not only when a candle is due,
+      // so a revoke in the wallet shows as "permission ended" within one tick.
+      if (s.live.status === "active" || s.live.status === "paused" || s.live.status === "closing") {
+        const w = await sessionOf(s.live.sessionId);
+        if (w.status === "active" && (w.lastDelegateCheck === null || nowMs - w.lastDelegateCheck >= DELEGATE_CHECK_MS)) {
+          const st = await delegationOf(s, nowMs);
+          if (!st.delegateMatches) {
+            await endPermission(s, "revoked", nowMs);
+            return;
+          }
+        }
+      }
       for (const o of await d.live.pendingOrders(s.id)) await settlePending(s, o, nowMs);
       await reconcileVanished(s, nowMs);
       await controls.finishIfFlat(s, nowMs);
@@ -471,7 +483,7 @@ export function liveDeps(d: ExecutorDeps): LiveDeps & LiveControls {
           takeProfit: plan.takeProfit,
           stopLoss: plan.stopLoss,
         });
-        await d.live.updateOrder(order.id, { takeProfit: plan.takeProfit, stopLoss: plan.stopLoss, updatedAt: nowMs } as never);
+        await d.live.updateOrder(order.id, { takeProfit: plan.takeProfit, stopLoss: plan.stopLoss, updatedAt: nowMs });
         hash = (await sd.signer.send(tx)).hash;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

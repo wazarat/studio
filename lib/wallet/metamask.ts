@@ -131,10 +131,26 @@ export async function sendFromWallet(from: Hex, tx: UnsignedTx): Promise<Hex> {
   if (tx.from.toLowerCase() !== from.toLowerCase()) throw new WalletError("other", "The transaction was built for a different wallet address.");
   await ensureLiveChain();
   const wallet = createWalletClient({ chain: LIVE_CHAIN, transport: custom(eth) });
+  // Arbitrum's base fee moves between the wallet's estimate and the send, and
+  // a cap below it is rejected, so the cap is set here with headroom.
+  const fees = await feeCaps();
   try {
-    return await wallet.sendTransaction({ account: from, to: tx.to, data: tx.data, value: BigInt(tx.value) });
+    return await wallet.sendTransaction({ account: from, to: tx.to, data: tx.data, value: BigInt(tx.value), ...fees });
   } catch (e) {
     throw wrap(e);
+  }
+}
+
+async function feeCaps(): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } | Record<string, never>> {
+  try {
+    const client = createPublicClient({ chain: LIVE_CHAIN, transport: http() });
+    const block = await client.getBlock();
+    const base = block.baseFeePerGas ?? 0n;
+    if (base <= 0n) return {};
+    const maxPriorityFeePerGas = 1_000_000n;
+    return { maxFeePerGas: base * 3n + maxPriorityFeePerGas, maxPriorityFeePerGas };
+  } catch {
+    return {};
   }
 }
 

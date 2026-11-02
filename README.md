@@ -138,12 +138,25 @@ through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
   USDC stay in the wallet and closes pay the wallet. Revoking in MetaMask
   (remove delegate, or approval to 0) stops every strategy on that wallet.
 - Session keys are secp256k1 keys in AWS KMS (`AWS_REGION`,
-  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`); signing happens inside KMS
-  and nothing in Studio ever holds or returns a key. One session per wallet
-  serves every live strategy on it; the key is disabled and scheduled for
-  deletion when the last one stops. Gas is a small Sepolia ETH top-up from
-  the dev wallet (`LIVE_GAS_TOPUP_ETH`); Ostium's sponsored path needs a
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`): CreateKey, then CreateAlias
+  as `alias/canhav-delegate/<session id>`, then GetPublicKey; Sign,
+  DisableKey and ScheduleKeyDeletion are alias-scoped and back off for five
+  minutes after creation while the alias propagates. Nothing in Studio ever
+  holds or returns a key. For testnet development `SESSION_SIGNER=local`
+  swaps in a local signer that keeps each key AES-256-GCM encrypted under
+  `SESSION_KEY_SECRET` in the gitignored `.session-keys/` folder and refuses
+  mainnet. One session per wallet serves every live strategy on it; the key
+  is destroyed when the last one stops. Gas is a small Sepolia ETH top-up
+  from the dev wallet (`LIVE_GAS_TOPUP_ETH`); Ostium's sponsored path needs a
   Safe delegate and their builder API, so there is no paymaster in this mode.
+- Walk-through on Sepolia (2026-11-02, local signer because the AWS
+  organisation policy denied kms:CreateKey): Go live from MetaMask opened a
+  real ETH position from the wallet with take profit and stop loss on the
+  Ostium trade; a second strategy on the same wallet was refused for the
+  open-interest share before any transaction; Pause then Close all closed
+  the position through the delegate while paused and the fill came back into
+  the feed; removeDelegate in MetaMask marked both strategies "permission
+  ended" at the next tick. Screenshots in `docs/screenshots/step7-*.jpg`.
 - The Go-live card on a strategy page: connect the wallet, read the terms
   (trade size and leverage, daily stop, total approval shown as trades,
   expiry, the contracts allowed), confirm two MetaMask transactions. Live

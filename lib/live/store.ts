@@ -107,7 +107,7 @@ export type NewOrder = Pick<LiveOrder, "strategyId" | "sessionId" | "ownerId" | 
 export type OrderPatch = Partial<
   Pick<
     LiveOrder,
-    "txHash" | "oid" | "pid" | "positionIndex" | "status" | "fillPrice" | "fillPnlUsd" | "fillFeesUsd" | "closedAt" | "closeReason" | "closePnlUsd" | "error"
+    "txHash" | "oid" | "pid" | "positionIndex" | "status" | "fillPrice" | "fillPnlUsd" | "fillFeesUsd" | "closedAt" | "closeReason" | "closePnlUsd" | "error" | "takeProfit" | "stopLoss"
   >
 > & { updatedAt: number };
 

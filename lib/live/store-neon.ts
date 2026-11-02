@@ -271,6 +271,8 @@ export const neonLiveStore: LiveStore = {
           close_reason = coalesce(${p.closeReason ?? null}, close_reason),
           close_pnl_usd = coalesce(${p.closePnlUsd ?? null}, close_pnl_usd),
           error = coalesce(${p.error ?? null}, error),
+          take_profit = coalesce(${p.takeProfit ?? null}, take_profit),
+          stop_loss = coalesce(${p.stopLoss ?? null}, stop_loss),
           updated_at = ${iso(p.updatedAt)}
       where id = ${id}`;
   },

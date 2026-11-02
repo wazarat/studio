@@ -378,7 +378,8 @@ describe("live executor", () => {
     const revoked = await world([strategy()], [10, 10, 10, 11]);
     revoked.fake.status = { ...revoked.fake.status, currentDelegate: "0x3333333333333333333333333333333333333333", delegateMatches: false };
     const r = await runTick(revoked.deps, at(4, 0.05));
-    expect(r.skips).toBe(1);
+    // Caught by the every-tick delegate check before any candle is considered.
+    expect(r.runs).toBe(0);
     expect(revoked.fake.opens).toHaveLength(0);
     expect((await revoked.live.link("s1"))!.status).toBe("permission-ended");
 

@@ -169,7 +169,7 @@ await sql`
   )`;
 
 await sql`alter table studio.activity drop constraint if exists activity_mode_check`;
-await sql`alter table studio.activity add constraint activity_mode_check check (mode in ('backtest', 'paper', 'agent'))`;
+await sql`alter table studio.activity add constraint activity_mode_check check (mode in ('backtest', 'paper', 'agent', 'live'))`; // widened in step 7
 await sql`alter table studio.activity drop constraint if exists activity_kind_check`;
 await sql`alter table studio.activity add constraint activity_kind_check check (kind in ('signal', 'fill', 'refusal', 'close', 'skip', 'proposal'))`;
 
@@ -248,6 +248,9 @@ await sql`create index if not exists live_orders_pending_idx on studio.live_orde
 
 await sql`alter table studio.activity drop constraint if exists activity_mode_check`;
 await sql`alter table studio.activity add constraint activity_mode_check check (mode in ('backtest', 'paper', 'agent', 'live'))`;
+// Live rows point at chain positions ("live:<pid>"), not paper rows.
+await sql`alter table studio.activity drop constraint if exists activity_position_id_fkey`;
+await sql`alter table studio.activity alter column position_id type text using position_id::text`;
 
 const tables = await sql`
   select table_name from information_schema.tables

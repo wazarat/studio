@@ -25,3 +25,6 @@ npm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# Step 7: local testnet session keys (encrypted), never committed
+.session-keys/
