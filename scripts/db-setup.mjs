@@ -137,6 +137,42 @@ await sql`alter table studio.paper_positions add constraint paper_positions_clos
   check (close_reason in ('signal', 'take-profit', 'stop-loss', 'liquidation', 'stopped', 'blown-out'))`;
 
 
+// Step 6: agent proposals and MCP connections.
+await sql`
+  create table if not exists studio.proposals (
+    id uuid primary key default gen_random_uuid(),
+    strategy_id uuid not null references studio.strategies(id) on delete cascade,
+    owner_id text not null,
+    kind text not null check (kind in ('change', 'paper-start', 'paper-stop')),
+    proposed_spec jsonb,
+    reason text not null,
+    backtest jsonb,
+    client_id text,
+    client_name text,
+    status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'withdrawn')),
+    created_at timestamptz not null default now(),
+    decided_at timestamptz
+  )`;
+await sql`create index if not exists proposals_strategy_idx on studio.proposals (strategy_id, created_at desc)`;
+await sql`create index if not exists proposals_pending_idx on studio.proposals (strategy_id) where status = 'pending'`;
+
+await sql`
+  create table if not exists studio.mcp_connections (
+    owner_id text not null,
+    client_id text not null,
+    client_name text,
+    server text not null,
+    first_seen_at timestamptz not null default now(),
+    last_seen_at timestamptz not null default now(),
+    calls integer not null default 0,
+    primary key (owner_id, client_id, server)
+  )`;
+
+await sql`alter table studio.activity drop constraint if exists activity_mode_check`;
+await sql`alter table studio.activity add constraint activity_mode_check check (mode in ('backtest', 'paper', 'agent'))`;
+await sql`alter table studio.activity drop constraint if exists activity_kind_check`;
+await sql`alter table studio.activity add constraint activity_kind_check check (kind in ('signal', 'fill', 'refusal', 'close', 'skip', 'proposal'))`;
+
 const tables = await sql`
   select table_name from information_schema.tables
   where table_schema = 'studio' order by table_name`;

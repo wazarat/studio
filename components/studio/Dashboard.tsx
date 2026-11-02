@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { ConnectCard } from "@/components/studio/ConnectCard";
 import { MarketsPreview } from "@/components/studio/MarketsPreview";
 import { Button } from "@/components/ui/Button";
 import { Card, CardSection } from "@/components/ui/Card";
@@ -91,6 +92,10 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
       </div>
 
       {admin && !data.storage ? <p className="text-sm text-rose-400">{STUDIO_COPY.storage}</p> : null}
+
+      {admin ? (
+        <ConnectCard baseUrl={data.baseUrl} alias="studio" path="/mcp" server="account" initial={data.connections.map((c) => ({ clientName: c.clientName, lastSeenAt: c.lastSeenAt, calls: c.calls }))} />
+      ) : null}
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">

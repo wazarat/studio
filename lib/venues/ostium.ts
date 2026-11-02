@@ -12,6 +12,7 @@ import {
   type BuiltTxRequest,
 } from "@ostium/builder-sdk";
 
+import { maxSizeNowUsd } from "@/lib/risk/check";
 import {
   VenueError,
   type Candle,
@@ -146,6 +147,7 @@ function toMarket(pair: Pair, at: number): Market {
       minLeverage: pair.minLeverage,
       maxLeverage: pair.maxLeverage,
       overnightMaxLeverage: pair.overnightMaxLeverage,
+      maxSizeNowUsd: maxSizeNowUsd(num(pair.maxOpenInterest) - num(pair.buyOpenInterest), num(pair.maxBSz) * mid),
     },
     openInterest: {
       longUsd: num(pair.buyOpenInterest),

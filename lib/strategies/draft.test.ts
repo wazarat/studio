@@ -4,7 +4,7 @@ import { clampLeverage, draftFromSpec, draftReducer, generatedName, leverageCap,
 import { StrategySpecSchema } from "@/lib/strategies/spec";
 
 const limits = (maxLeverage: number, overnightMaxLeverage: number) => ({
-  limits: { minNotionalUsd: 5, maxNotionalLongUsd: 1e6, maxNotionalShortUsd: 1e6, minLeverage: 1, maxLeverage, overnightMaxLeverage },
+  limits: { minNotionalUsd: 5, maxNotionalLongUsd: 1e6, maxNotionalShortUsd: 1e6, minLeverage: 1, maxLeverage, overnightMaxLeverage, maxSizeNowUsd: 5_000 },
 });
 
 describe("generatedName", () => {

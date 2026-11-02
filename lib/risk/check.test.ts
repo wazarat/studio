@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PriceComparison } from "@/lib/chainlink/compare";
-import { checkRisk, type OpenRiskInput, type RiskCode } from "@/lib/risk/check";
+import { checkRisk, LIMITED_BELOW_USD, maxSizeNowUsd, type OpenRiskInput, type RiskCode } from "@/lib/risk/check";
 
 /**
  * Every cap in the brief, proven: trades outside a cap are refused, closes
@@ -36,6 +36,7 @@ function open(overrides: Partial<OpenRiskInput> = {}): OpenRiskInput {
         minLeverage: 1,
         maxLeverage: 50,
         overnightMaxLeverage: 0,
+        maxSizeNowUsd: 1_000,
       },
       openInterest: { longUsd: 400_000, shortUsd: 100_000, maxPerSideUsd: 500_000 },
       hours: { isOpen: true, isDayTradingClosed: false, secondsToToggleDayTrading: null, checkedAt: 0 },
@@ -171,6 +172,17 @@ describe("checkRisk", () => {
     it("still enforces every other cap on testnet", () => {
       expect(codes(open({ testnet: true, intent: { leverage: 6 } as never }))).toContain("leverage-over-tier");
     });
+  });
+
+  it("max size now is exactly what the open-interest rule allows", () => {
+    // 100,000 left on the long side → 1% = 1,000, within a 1,000,000 pair room.
+    expect(maxSizeNowUsd(100_000, 1_000_000)).toBe(1_000);
+    expect(codes(open({ sizeUsd: 1_000 }))).toEqual([]);
+    expect(codes(open({ sizeUsd: 1_000.01 }))).toContain("size-over-oi-share");
+    // The pair's own room can be the tighter bound; a full side gives zero and is "limited".
+    expect(maxSizeNowUsd(100_000, 600)).toBe(600);
+    expect(maxSizeNowUsd(-5_000, 1_000_000)).toBe(0);
+    expect(maxSizeNowUsd(4_000, 1_000_000)).toBeLessThan(LIMITED_BELOW_USD);
   });
 
   it("refuses a closed market", () => {

@@ -12,7 +12,9 @@
     "db:setup": "node --env-file=.env.local scripts/db-setup.mjs"
   },
   "dependencies": {
+    "@clerk/mcp-tools": "^0.8.0",
     "@clerk/nextjs": "^7.9.21",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@neondatabase/serverless": "^1.2.0",
     "@ostium/builder-sdk": "^0.12.0",
     "@vercel/analytics": "^2.0.1",

@@ -5,8 +5,10 @@ import { auth } from "@clerk/nextjs/server";
 import { Workspace } from "@/components/studio/Workspace";
 import { getInternalAdminGate, getMarketNames } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
+import { listConnections } from "@/lib/mcp/connections";
 import { loadPaperForStrategy } from "@/lib/paper/summary";
-import { getStrategy } from "@/lib/strategies/db";
+import { pendingProposals } from "@/lib/proposals/db";
+import { getStrategy, latestBacktest } from "@/lib/strategies/db";
 import { draftFromSpec } from "@/lib/strategies/draft";
 import { cachedCandles, loadMarkets } from "@/lib/strategies/markets";
 
@@ -25,11 +27,15 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
 
   const bundle = await loadMarkets();
   if (!bundle.markets.some((m) => m.id === row.spec.market.marketId)) notFound();
-  const [candles, paper, names] = await Promise.all([
+  const [candles, paper, names, proposals, connections, saved] = await Promise.all([
     cachedCandles(row.spec.market.marketId).catch(() => null),
     loadPaperForStrategy(row.ownerId, row.id, row.status, row.paperSince, row.blownOutAt),
     getMarketNames(),
+    pendingProposals(row.id),
+    listConnections(row.ownerId, row.id),
+    latestBacktest(row.id),
   ]);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || "http://localhost:3000";
 
   return (
     <Workspace
@@ -41,6 +47,10 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
       savedSpec={row.spec}
       initialPaper={paper}
       initialNames={names}
+      initialProposals={proposals}
+      initialConnections={connections.map((c) => ({ clientName: c.clientName, lastSeenAt: c.lastSeenAt, calls: c.calls }))}
+      baseUrl={baseUrl}
+      savedBacktest={saved?.results ?? null}
     />
   );
 }

@@ -8,6 +8,7 @@ import { Card, CardSection } from "@/components/ui/Card";
 import { STUDIO_COPY } from "@/content/studio";
 import { getInternalAdminGate, getMarketNames, getOnboardingGate } from "@/lib/auth";
 import { STUDIO_PATH, loginPathFor } from "@/lib/auth-paths";
+import { consentRedirectTarget } from "@/lib/sign-in-redirect";
 import { loadDashboard } from "@/lib/strategies/dashboard";
 
 export const metadata: Metadata = { title: STUDIO_COPY.kicker, robots: { index: false } };
@@ -19,9 +20,16 @@ export const dynamic = "force-dynamic";
  * allowlist; everyone else sees the shell with markets and templates. An
  * account that has not finished signing up gets the steps as a pop-up.
  */
-export default async function StudioPage() {
+export default async function StudioPage({ searchParams }: { searchParams: Promise<{ redirect_url?: string }> }) {
+  const { redirect_url: redirectUrl } = await searchParams;
   const gate = await getOnboardingGate();
-  if (gate === "signed-out") redirect(loginPathFor(STUDIO_PATH));
+  if (gate === "signed-out") redirect(loginPathFor(redirectUrl ? `${STUDIO_PATH}?redirect_url=${encodeURIComponent(redirectUrl)}` : STUDIO_PATH));
+
+  // An MCP client's OAuth consent hop: Clerk sends a signed-in person here with the consent page as redirect_url.
+  if (redirectUrl) {
+    const target = consentRedirectTarget(redirectUrl, process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000", process.env.NEXT_PUBLIC_APP_URL);
+    if (target && !target.startsWith(STUDIO_PATH)) redirect(target);
+  }
 
   if (gate === "unconfigured") {
     return (

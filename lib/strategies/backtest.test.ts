@@ -24,7 +24,7 @@ function bars(closes: number[], times?: number[]): Candle[] {
 function market(overrides: Partial<MarketSnapshot> = {}): MarketSnapshot {
   return {
     symbol: "BTC/USD",
-    limits: { minNotionalUsd: 5, maxNotionalLongUsd: 1e6, maxNotionalShortUsd: 1e6, minLeverage: 1, maxLeverage: 50, overnightMaxLeverage: 0 },
+    limits: { minNotionalUsd: 5, maxNotionalLongUsd: 1e6, maxNotionalShortUsd: 1e6, minLeverage: 1, maxLeverage: 50, overnightMaxLeverage: 0, maxSizeNowUsd: 5_000 },
     openInterest: { longUsd: 400_000, shortUsd: 100_000, maxPerSideUsd: 500_000 },
     hours: { isOpen: true, isDayTradingClosed: false, secondsToToggleDayTrading: null, checkedAt: 0 },
     fees: { openBps: 10, closeBps: 0, oracleFeeUsd: 0.5 },

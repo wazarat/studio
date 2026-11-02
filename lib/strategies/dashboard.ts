@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listConnections, type McpConnection } from "@/lib/mcp/connections";
 import { mergeActivity, paperEvent } from "@/lib/paper/activity";
 import { paperActivityFor } from "@/lib/paper/store-neon";
 import { loadPaperSummary, type PaperSummary } from "@/lib/paper/summary";
@@ -35,6 +36,8 @@ export interface DashboardData extends MarketsBundle {
   nextCheckAt: number;
   storage: boolean;
   paper: PaperSummary | null;
+  connections: McpConnection[];
+  baseUrl: string;
 }
 
 const DAY_MS = 86_400_000;
@@ -45,12 +48,12 @@ function day(ms: number): string {
 }
 
 export async function loadDashboard(userId: string | null, admin: boolean, names: "simple" | "pairs" = "simple"): Promise<DashboardData> {
-  const bundle = { ...(await loadMarkets()), names };
+  const bundle = { ...(await loadMarkets()), names, baseUrl: process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || "http://localhost:3000" };
   const nextCheckAt = Math.ceil(Date.now() / DAY_MS) * DAY_MS;
   const storage = storageConfigured();
-  if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage, paper: null };
+  if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage, paper: null, connections: [] };
 
-  const [strategies, paper, paperRows] = await Promise.all([listStrategies(userId), loadPaperSummary(userId, bundle.prices), paperActivityFor(userId, null, 50)]);
+  const [strategies, paper, paperRows, connections] = await Promise.all([listStrategies(userId), loadPaperSummary(userId, bundle.prices), paperActivityFor(userId, null, 50), listConnections(userId, "account")]);
   const backtests = await latestBacktests(strategies.map((s) => s.id));
   const results = new Map(Array.from(backtests, ([id, b]) => [id, b.results]));
   const byId = new Map(strategies.map((s) => [s.id, s]));
@@ -100,5 +103,6 @@ export async function loadDashboard(userId: string | null, admin: boolean, names
     nextCheckAt,
     storage,
     paper,
+    connections,
   };
 }

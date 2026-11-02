@@ -13,7 +13,7 @@ import type { Candle, Market, Price } from "@/lib/venues/types";
 
 export type CloseReason = "signal" | "take-profit" | "stop-loss" | "liquidation" | "stopped" | "blown-out";
 export type RunOutcome = "hold" | "entered" | "exited" | "refused";
-export type ActivityKind = "signal" | "fill" | "refusal" | "close" | "skip";
+export type ActivityKind = "signal" | "fill" | "refusal" | "close" | "skip" | "proposal";
 
 export interface PaperStrategy {
   id: string;
@@ -88,8 +88,9 @@ export interface NewActivity {
   time: number;
 }
 
-export interface ActivityRow extends NewActivity {
+export interface ActivityRow extends Omit<NewActivity, "mode"> {
   id: string;
+  mode: "paper" | "agent";
 }
 
 export interface PaperStore {

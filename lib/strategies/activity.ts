@@ -10,10 +10,10 @@ export interface ActivityEvent {
   id: string;
   strategyId: string;
   strategyName: string;
-  kind: "entry" | "exit" | "refused" | "signal" | "skip";
+  kind: "entry" | "exit" | "refused" | "signal" | "skip" | "proposal";
   time: number;
   text: string;
-  source: "backtest" | "paper";
+  source: "backtest" | "paper" | "agent";
 }
 
 interface StrategyLike {

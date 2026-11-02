@@ -45,6 +45,8 @@ export interface MarketLimits {
   maxLeverage: number;
   /** 0 means no overnight restriction. */
   overnightMaxLeverage: number;
+  /** The most notional one Studio trade may open right now: 1% of the remaining long open interest, within the pair's own room. */
+  maxSizeNowUsd: number;
 }
 
 export interface Market {

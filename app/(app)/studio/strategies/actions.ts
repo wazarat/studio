@@ -9,7 +9,11 @@ import { referenceFor, toleranceBps } from "@/lib/chainlink/read";
 import { checkRisk, type RiskFinding } from "@/lib/risk/check";
 import { runBacktest, type BacktestResult, type MarketSnapshot } from "@/lib/strategies/backtest";
 import { getStrategy, insertBacktest, insertStrategy, lossTodayUsd, storageConfigured, updateStrategy } from "@/lib/strategies/db";
+import { listConnections } from "@/lib/mcp/connections";
 import { ensurePaperAccount, setStrategyStatus } from "@/lib/paper/store-neon";
+import { getProposal, markDecided, pendingProposals, recordAgentActivity } from "@/lib/proposals/db";
+import { decideProposal, specDiff } from "@/lib/proposals/decide";
+import type { Proposal } from "@/lib/proposals/types";
 import { loadPaperForStrategy, type PaperForStrategy } from "@/lib/paper/summary";
 import { stopPaper } from "@/lib/paper/tick";
 import { cachedCandles, loadMarkets, type MarketsBundle } from "@/lib/strategies/markets";
@@ -159,6 +163,73 @@ export async function setPaperStatusAction(id: string, status: "paper" | "draft"
     const fresh = await getStrategy(row.id, ownerId);
     const paper = await loadPaperForStrategy(ownerId, row.id, fresh?.status ?? status, fresh?.paperSince ?? null, fresh?.blownOutAt ?? null);
     return { ok: true, paper, note };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/* ---------- agent proposals and connections (step 6) ---------- */
+
+export async function listProposalsAction(id: string): Promise<Result<{ proposals: Proposal[] }>> {
+  try {
+    const ownerId = await owner();
+    const row = await getStrategy(z.string().uuid().parse(id), ownerId);
+    if (!row) return { ok: false, error: "Not found" };
+    return { ok: true, proposals: await pendingProposals(row.id) };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Only the user's click applies a proposal; the decision rules are pure and tested. */
+export async function decideProposalAction(proposalId: string, action: "accept" | "reject"): Promise<Result<{ status: "accepted" | "rejected"; note: string }>> {
+  try {
+    const ownerId = await owner();
+    const proposal = await getProposal(z.string().uuid().parse(proposalId), ownerId);
+    if (!proposal) return { ok: false, error: "Not found" };
+    const row = await getStrategy(proposal.strategyId, ownerId);
+    if (!row) return { ok: false, error: "Not found" };
+    const decision = decideProposal(proposal, row.status, action);
+    if (!decision.ok) return { ok: false, error: decision.error };
+    const who = proposal.clientName ?? "an agent";
+    let note = "";
+    if (decision.action === "reject") {
+      note = "Rejected.";
+    } else if (decision.action === "apply-change") {
+      const market = (await ostium.markets()).find((m) => m.id === decision.spec.market.marketId);
+      if (!market) return { ok: false, error: "The proposed market is no longer listed." };
+      const updated = await updateStrategy(ownerId, decision.spec);
+      if (!updated) return { ok: false, error: "Could not update the strategy." };
+      await storeBacktest(decision.spec, market);
+      note = `Accepted: ${specDiff(row.spec, decision.spec).map((d) => `${d.field} ${d.from} → ${d.to}`).join(", ")}.`;
+    } else if (decision.action === "paper-start") {
+      await ensurePaperAccount(ownerId);
+      if (!(await setStrategyStatus(ownerId, row.id, "paper", "draft"))) return { ok: false, error: "Could not start paper trading." };
+      note = "Accepted: paper trading started.";
+    } else {
+      if (!(await setStrategyStatus(ownerId, row.id, "draft", "paper"))) return { ok: false, error: "Could not stop paper trading." };
+      const stopped = await stopPaper(row.id);
+      note = `Accepted: paper trading stopped. ${stopped.note}`;
+    }
+    const decided = await markDecided(proposal.id, ownerId, action === "accept" ? "accepted" : "rejected");
+    if (!decided) return { ok: false, error: "This proposal was already decided." };
+    await recordAgentActivity({
+      strategyId: row.id,
+      ownerId,
+      reason: `${action === "accept" ? "Accepted" : "Rejected"} ${who}'s ${proposal.kind === "change" ? "change" : proposal.kind === "paper-start" ? "request to start paper trading" : "request to stop paper trading"}: ${proposal.reason}`,
+      meta: { proposalId: proposal.id, kind: proposal.kind, client: who },
+    });
+    return { ok: true, status: decided.status as "accepted" | "rejected", note };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function connectionsAction(server: string): Promise<Result<{ connections: { clientName: string; lastSeenAt: number; calls: number }[] }>> {
+  try {
+    const ownerId = await owner();
+    const rows = await listConnections(ownerId, z.string().min(1).max(64).parse(server));
+    return { ok: true, connections: rows.map((r) => ({ clientName: r.clientName, lastSeenAt: r.lastSeenAt, calls: r.calls })) };
   } catch (error) {
     return fail(error);
   }

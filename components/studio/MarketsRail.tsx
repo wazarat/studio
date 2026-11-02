@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 
 import { inputClasses } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
-import { formatPrice } from "@/lib/venues/format";
+import { LIMITED_BELOW_USD } from "@/lib/risk/check";
+import { formatPrice, formatUsdCompact } from "@/lib/venues/format";
 import { MARKET_NAME_OPTIONS, fullName, marketLabel, type MarketNames } from "@/lib/venues/names";
 import type { Market, Price } from "@/lib/venues/types";
 
@@ -102,6 +103,8 @@ export function MarketsRail({
                   <span className="block text-[10px] text-ink-500">
                     {open ? "Open" : "Closed"}
                     {label.secondary ? ` · ${label.secondary}` : ""}
+                    {` · max ${formatUsdCompact(m.limits.maxSizeNowUsd)} now`}
+                    {m.limits.maxSizeNowUsd < LIMITED_BELOW_USD ? <span className="ml-1 rounded-md border border-ink-700/60 px-1 text-[9px] uppercase tracking-wide text-ink-400">limited</span> : null}
                   </span>
                 </span>
                 <span className="text-right tabular-nums">

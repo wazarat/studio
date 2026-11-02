@@ -22,6 +22,18 @@ export interface RiskLimits {
   referenceToleranceBps: number;
 }
 
+/** Below this "max size now" a market is tagged limited, so people learn it before the checker refuses them. */
+export const LIMITED_BELOW_USD = 50;
+
+/** The most notional one trade may open on a market right now, by the open-interest rule and the pair's own room. */
+export function maxSizeNowUsd(
+  remainingOiUsd: number,
+  pairRoomUsd: number,
+  maxOiShareBps: number = DEFAULT_RISK_LIMITS.maxOiShareBps,
+): number {
+  return Math.max(0, Math.min((Math.max(0, remainingOiUsd) * maxOiShareBps) / 10_000, Math.max(0, pairRoomUsd)));
+}
+
 export const DEFAULT_RISK_LIMITS: RiskLimits = {
   maxLeverageByTier: { studio: 5, "studio-plus": 15 },
   maxPositionUsdPerStrategy: 1_000,

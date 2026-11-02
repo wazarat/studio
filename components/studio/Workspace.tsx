@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useTransition } from "react";
 
-import { candlesAction, marketsAction, paperStateAction, saveStrategyAction, setPaperStatusAction } from "@/app/(app)/studio/strategies/actions";
+import { candlesAction, listProposalsAction, marketsAction, paperStateAction, saveStrategyAction, setPaperStatusAction } from "@/app/(app)/studio/strategies/actions";
+import { ConnectCard, type ConnectionView } from "@/components/studio/ConnectCard";
+import { ProposalCard } from "@/components/studio/ProposalCard";
+import { serverAlias, serverPath } from "@/lib/mcp/connect";
+import type { Proposal } from "@/lib/proposals/types";
 import { PriceChart } from "@/components/charts/dynamic";
 import { MarketsRail } from "@/components/studio/MarketsRail";
 import { RulePanel } from "@/components/studio/RulePanel";
@@ -16,7 +20,7 @@ import { inputClasses } from "@/components/ui/Input";
 import { paperMarkersFor } from "@/lib/paper/activity";
 import { unrealised } from "@/lib/paper/engine";
 import type { PaperForStrategy } from "@/lib/paper/summary";
-import { checkRisk, type RiskFinding } from "@/lib/risk/check";
+import { checkRisk, LIMITED_BELOW_USD, type RiskFinding } from "@/lib/risk/check";
 import { BacktestError, runBacktest, tradeCosts, type BacktestResult } from "@/lib/strategies/backtest";
 import { markersFor, overlaysFor, paneFor } from "@/lib/strategies/chart-data";
 import { draftReducer, generatedName, leverageCap, toSpec, type Draft } from "@/lib/strategies/draft";
@@ -41,6 +45,10 @@ export interface WorkspaceProps {
   savedSpec: StrategySpec | null;
   initialPaper: PaperForStrategy | null;
   initialNames: MarketNames;
+  initialProposals: Proposal[];
+  initialConnections: ConnectionView[];
+  baseUrl: string;
+  savedBacktest: BacktestResult | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -52,6 +60,7 @@ export function Workspace(props: WorkspaceProps) {
   const [draft, dispatch] = useReducer(draftReducer, props.initialDraft);
   const [savedSpec, setSavedSpec] = useState<StrategySpec | null>(props.savedSpec);
   const [paper, setPaper] = useState<PaperForStrategy | null>(props.initialPaper);
+  const [proposals, setProposals] = useState<Proposal[]>(props.initialProposals);
   const [paperNote, setPaperNote] = useState<string | null>(null);
   const [toggling, startToggle] = useTransition();
   const live = useLivePrices(props.prices, true);
@@ -167,6 +176,17 @@ export function Workspace(props: WorkspaceProps) {
     if (p.stopLoss) lines.push({ price: p.stopLoss, title: "stop loss", color: "muted" });
     return lines;
   }, [paper?.open]);
+
+  // Pending proposals refresh while the strategy is saved.
+  useEffect(() => {
+    if (!draft.id) return;
+    const id = draft.id;
+    const t = setInterval(async () => {
+      const res = await listProposalsAction(id);
+      if (res.ok) setProposals(res.proposals);
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [draft.id]);
 
   // Paper state refresh while on paper.
   useEffect(() => {
@@ -288,7 +308,14 @@ export function Workspace(props: WorkspaceProps) {
             <span className={cn("text-xs tabular-nums", change === undefined ? "text-ink-500" : change < 0 ? "text-rose-400" : "text-ink-400")}>
               {change === undefined ? "" : `${change >= 0 ? "+" : "−"}${Math.abs(change).toFixed(2)}% today`}
             </span>
-            <span className="text-xs text-ink-400">{open ? "Open" : "Closed"} · {market.category}</span>
+            <span className="text-xs text-ink-400">
+              {open ? "Open" : "Closed"} · {market.category} · max {formatUsd(market.limits.maxSizeNowUsd, 0)} now
+              {market.limits.maxSizeNowUsd < LIMITED_BELOW_USD ? (
+                <span className="ml-1 rounded-md border border-ink-700/60 px-1 text-[9px] uppercase tracking-wide text-ink-400" title="Under $50 of room: the checker will refuse most sizes here">
+                  limited
+                </span>
+              ) : null}
+            </span>
           </div>
           <p className="text-[11px] text-ink-500">
             {live.state === "live" && live.lastTickAt ? `Live · ${formatAgo(live.lastTickAt, now)}` : live.state === "retrying" ? "Reconnecting" : "Connecting"} · next check at daily close, {formatCountdown(nextClose - now)}
@@ -297,6 +324,31 @@ export function Workspace(props: WorkspaceProps) {
         <p className="border-b border-ink-700/40 px-4 py-1.5 text-[11px] text-ink-500">{PERP_NOTE}</p>
         {!open ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{marketShort(market, names)} is closed right now. You can design and save; the checker refuses an open until it reopens.</p> : null}
         {savedNote ? <p className="border-b border-ink-700/40 px-4 py-2 text-xs text-ink-400">{savedNote}</p> : null}
+        {proposals.map((p) => (
+          <ProposalCard
+            key={p.id}
+            proposal={p}
+            currentSpec={savedSpec ?? spec}
+            currentBacktest={run.result ?? props.savedBacktest}
+            strategyStatus={paper?.status ?? draft.status}
+            now={now}
+            onDecided={(status, note) => {
+              setProposals((prev) => prev.filter((x) => x.id !== p.id));
+              setSavedNote(note);
+              if (status === "accepted" && p.kind === "change" && p.proposedSpec) {
+                const next = { ...p.proposedSpec, id: p.strategyId, status: "draft" as const };
+                setSavedSpec(next);
+                window.location.reload();
+              } else if (status === "accepted") {
+                const nextStatus = p.kind === "paper-start" ? ("paper" as const) : ("draft" as const);
+                dispatch({ type: "status", status: nextStatus });
+                setSavedSpec((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+                if (draft.id) void paperStateAction(draft.id).then((r) => r.ok && setPaper(r.paper));
+              }
+              router.refresh();
+            }}
+          />
+        ))}
         {paper?.open ? (
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-ink-700/40 px-4 py-2 text-xs">
             <span className="font-medium text-signal-400">Paper long</span>
@@ -322,6 +374,11 @@ export function Workspace(props: WorkspaceProps) {
         </div>
 
         <ResultsTabs result={run.result} error={run.error} startUsd={draft.size.collateralUsd} paper={paper} symbol={market.symbol} />
+        {draft.id ? (
+          <div className="border-t border-ink-700/40 p-4">
+            <ConnectCard baseUrl={props.baseUrl} alias={serverAlias(name, draft.id)} path={serverPath(draft.id)} server={draft.id} initial={props.initialConnections} />
+          </div>
+        ) : null}
       </section>
 
       <aside className="border-t border-ink-700/40 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto lg:border-l lg:border-t-0">
