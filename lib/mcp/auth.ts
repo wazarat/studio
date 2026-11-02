@@ -93,9 +93,12 @@ async function clientName(clientId: string): Promise<string> {
       }
     }
   } else {
+    // Clerk's `get` wants the application id (oa_…); the token only carries
+    // the OAuth client id, which the list endpoint exposes alongside the name.
     try {
-      const app = await (await clerkClient()).oauthApplications.get(clientId);
-      if (app?.name) name = app.name;
+      const page = await (await clerkClient()).oauthApplications.list({ limit: 100 });
+      const app = page.data.find((a) => a.clientId === clientId);
+      name = app?.name?.trim() || `client ${clientId.slice(0, 8)}`;
     } catch {
       name = `client ${clientId.slice(0, 8)}`;
     }
