@@ -14,12 +14,12 @@ import { delegatedVenue, findOrdersByTxHash, getDelegationStatus, getFillsSince,
 export function sessionDepsFor(w: WalletSession): SessionDeps {
   return {
     venue: delegatedVenue(w.trader, w.sessionAddress),
-    signer: kmsSigner(w.kmsKeyId, w.sessionAddress),
+    signer: kmsSigner(w.kmsKeyId, w.sessionAddress, w.createdAt),
     positions: () => ostium.positions(w.trader),
     fillsSince: (fromMs) => getFillsSince(w.trader, fromMs),
     delegation: (requiredUsd) => getDelegationStatus(w.trader, w.sessionAddress, requiredUsd),
     orderId: (hash, action) => orderIdFromReceipt(hash, w.trader, action),
     orderStatus: (hash) => findOrdersByTxHash(hash),
-    destroyKey: () => destroySessionKey(w.kmsKeyId),
+    destroyKey: () => destroySessionKey(w.kmsKeyId, w.createdAt),
   };
 }

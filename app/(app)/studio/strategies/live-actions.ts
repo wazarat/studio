@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "node:crypto";
 import type { Hex } from "viem";
 import { z } from "zod";
 
@@ -84,8 +85,13 @@ export async function prepareLiveAction(
 
     let session = await neonLiveStore.sessionForWallet(ownerId, traderAddr);
     if (!session) {
-      const key = await createSessionKey(`studio:${ownerId.slice(-8)}:${traderAddr.slice(2, 10)}`);
-      session = await neonLiveStore.createSession({ ownerId, trader: traderAddr, sessionAddress: key.address, kmsKeyId: key.keyId, expiresAt: t.expiresAtMs }, Date.now());
+      // The session id is chosen first so the key's alias can carry it.
+      const sessionId = randomUUID();
+      const key = await createSessionKey(sessionId);
+      session = await neonLiveStore.createSession(
+        { id: sessionId, ownerId, trader: traderAddr, sessionAddress: key.address, kmsKeyId: key.keyId, expiresAt: t.expiresAtMs },
+        key.createdAt,
+      );
     }
     const others = (await neonLiveStore.linksForSession(session.id)).filter((l) => l.strategyId !== row.id && ["active", "paused", "closing"].includes(l.status));
     const approveUsd = others.reduce((a, l) => a + Math.max(0, l.totalCapUsd - l.spentUsd), 0) + t.totalCapUsd;
@@ -188,7 +194,7 @@ export async function stopLiveAction(id: string): Promise<Result<{ view: LiveVie
       if (rest.length === 0) {
         const session = await neonLiveStore.session(link.sessionId);
         if (session && (await neonLiveStore.setSessionStatus(session.id, "ended", ["pending", "active", "permission-ended"], now, "stopped"))) {
-          await destroySessionKey(session.kmsKeyId).catch(() => undefined);
+          await destroySessionKey(session.kmsKeyId, session.createdAt).catch(() => undefined);
         }
       }
       note = "Stopped. The session key is destroyed; any position still open belongs to your wallet and closes in the Ostium app.";

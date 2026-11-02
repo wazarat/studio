@@ -144,8 +144,8 @@ export const neonLiveStore: LiveStore = {
   async createSession(s: NewSession, nowMs) {
     const sql = sqlOrThrow();
     const rows = await sql`
-      insert into studio.wallet_sessions (owner_id, trader_address, session_address, kms_key_id, expires_at, created_at)
-      values (${s.ownerId}, ${s.trader}, ${s.sessionAddress}, ${s.kmsKeyId}, ${s.expiresAt ? iso(s.expiresAt) : null}, ${iso(nowMs)})
+      insert into studio.wallet_sessions (id, owner_id, trader_address, session_address, kms_key_id, expires_at, created_at)
+      values (coalesce(${s.id ?? null}::uuid, gen_random_uuid()), ${s.ownerId}, ${s.trader}, ${s.sessionAddress}, ${s.kmsKeyId}, ${s.expiresAt ? iso(s.expiresAt) : null}, ${iso(nowMs)})
       returning *`;
     return toSession(rows[0]);
   },

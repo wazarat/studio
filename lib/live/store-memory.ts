@@ -58,7 +58,7 @@ export class MemoryLiveStore implements LiveStore {
 
   async createSession(s: NewSession, nowMs: number) {
     const w: WalletSession = {
-      id: `ws-${++this.seq}`,
+      id: s.id ?? `ws-${++this.seq}`,
       ownerId: s.ownerId,
       trader: s.trader,
       sessionAddress: s.sessionAddress,

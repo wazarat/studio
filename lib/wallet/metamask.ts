@@ -20,10 +20,45 @@ interface Eip1193 {
 
 export const LIVE_CHAIN = arbitrumSepolia;
 
+/** True when some injected wallet exists at all; the one used is picked by `provider()`. */
 export function getInjected(): Eip1193 | null {
   if (typeof window === "undefined") return null;
   const eth = (window as unknown as { ethereum?: Eip1193 }).ethereum;
-  return eth ?? null;
+  return eth ?? picked ?? null;
+}
+
+interface Announced {
+  info: { rdns?: string; name?: string };
+  provider: Eip1193;
+}
+
+let picked: Eip1193 | null = null;
+let discovered: Promise<Eip1193 | null> | null = null;
+
+/**
+ * Several extensions fight over `window.ethereum`; EIP-6963 lets each one
+ * announce itself instead. MetaMask is preferred when it announces, then
+ * whatever else announced, then `window.ethereum`.
+ */
+function provider(): Promise<Eip1193 | null> {
+  if (picked) return Promise.resolve(picked);
+  if (typeof window === "undefined") return Promise.resolve(null);
+  discovered ??= new Promise<Eip1193 | null>((resolve) => {
+    const found: Announced[] = [];
+    const onAnnounce = (ev: Event) => {
+      const d = (ev as CustomEvent<Announced>).detail;
+      if (d?.provider) found.push(d);
+    };
+    window.addEventListener("eip6963:announceProvider", onAnnounce);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    setTimeout(() => {
+      window.removeEventListener("eip6963:announceProvider", onAnnounce);
+      const metamask = found.find((f) => f.info.rdns === "io.metamask");
+      picked = metamask?.provider ?? found[0]?.provider ?? (window as unknown as { ethereum?: Eip1193 }).ethereum ?? null;
+      resolve(picked);
+    }, 400);
+  });
+  return discovered;
 }
 
 export class WalletError extends Error {
@@ -45,7 +80,7 @@ function wrap(e: unknown): WalletError {
 
 /** Asks the wallet for its first account. */
 export async function connectWallet(): Promise<Hex> {
-  const eth = getInjected();
+  const eth = await provider();
   if (!eth) throw new WalletError("missing", "No wallet found in this browser. Install MetaMask, then reload this page.");
   try {
     const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
@@ -59,7 +94,7 @@ export async function connectWallet(): Promise<Hex> {
 
 /** Switches the wallet to Arbitrum Sepolia, adding the network when the wallet does not know it. */
 export async function ensureLiveChain(): Promise<void> {
-  const eth = getInjected();
+  const eth = await provider();
   if (!eth) throw new WalletError("missing", "No wallet found in this browser.");
   const hex = `0x${LIVE_CHAIN.id.toString(16)}`;
   const current = (await eth.request({ method: "eth_chainId" })) as string;
@@ -90,7 +125,7 @@ export async function ensureLiveChain(): Promise<void> {
 
 /** Sends one venue-built transaction from the connected account and returns its hash. */
 export async function sendFromWallet(from: Hex, tx: UnsignedTx): Promise<Hex> {
-  const eth = getInjected();
+  const eth = await provider();
   if (!eth) throw new WalletError("missing", "No wallet found in this browser.");
   if (tx.chainId !== LIVE_CHAIN.id) throw new WalletError("chain", `This transaction is for chain ${tx.chainId}, not Arbitrum Sepolia.`);
   if (tx.from.toLowerCase() !== from.toLowerCase()) throw new WalletError("other", "The transaction was built for a different wallet address.");

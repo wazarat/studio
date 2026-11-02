@@ -40,6 +40,8 @@ export interface WalletSession {
 }
 
 export interface NewSession {
+  /** Chosen before the KMS key is created, so the key's alias can carry it. */
+  id?: string;
   ownerId: string;
   trader: Hex;
   sessionAddress: Hex;
