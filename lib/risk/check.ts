@@ -64,6 +64,12 @@ export interface OpenRiskInput {
   /** null when the market has no Chainlink feed. */
   reference: PriceComparison | null;
   limits?: Partial<RiskLimits>;
+  /**
+   * Notional the same wallet already has open in this market on this side
+   * across every strategy (step 7, live). The open-interest share counts it
+   * with the new trade; the per-strategy cap does not.
+   */
+  walletOpenInMarketUsd?: number;
 }
 
 export interface CloseRiskInput {
@@ -176,12 +182,16 @@ export function checkRisk(input: RiskInput): RiskResult {
   const sideOi = intent.side === "long" ? market.openInterest.longUsd : market.openInterest.shortUsd;
   const remainingOiUsd = Math.max(0, market.openInterest.maxPerSideUsd - sideOi);
   const oiCap = (remainingOiUsd * limits.maxOiShareBps) / 10_000;
-  if (sizeUsd > oiCap) {
+  const walletInMarket = Math.max(0, input.walletOpenInMarketUsd ?? 0);
+  if (sizeUsd + walletInMarket > oiCap) {
     refusals.push({
       code: "size-over-oi-share",
-      message: `${usd(sizeUsd)} is more than ${limits.maxOiShareBps / 100}% of the ${usd(remainingOiUsd)} open interest left on the ${intent.side} side.`,
+      message:
+        walletInMarket > 0
+          ? `${usd(sizeUsd)} on top of the wallet's ${usd(walletInMarket)} already open would be more than ${limits.maxOiShareBps / 100}% of the ${usd(remainingOiUsd)} open interest left on the ${intent.side} side.`
+          : `${usd(sizeUsd)} is more than ${limits.maxOiShareBps / 100}% of the ${usd(remainingOiUsd)} open interest left on the ${intent.side} side.`,
       limit: oiCap,
-      actual: sizeUsd,
+      actual: sizeUsd + walletInMarket,
     });
   }
 

@@ -130,7 +130,7 @@ export function Dashboard({ data, admin }: { data: DashboardData; admin: boolean
                       <span className="ml-2 text-ink-500">{r.rule}</span>
                     </td>
                     <td className={TD}>{(() => { const m = data.markets.find((x) => x.symbol === r.symbol); return m ? marketShort(m, data.names) : r.symbol; })()}</td>
-                    <td className={cn(TD, r.status === "paper" && "text-signal-400", r.status === "blown out" && "text-rose-400")}>{r.status}</td>
+                    <td className={cn(TD, r.status === "paper" && "text-signal-400", r.status === "live" && "text-emerald-400", (r.status === "blown out" || r.status === "permission ended") && "text-rose-400")}>{r.status}</td>
                     <td className={cn(TD, "text-right tabular-nums text-ink-100")}>{r.returnPct === null ? "–" : pct(r.returnPct)}</td>
                     <td className={cn(TD, "text-right tabular-nums")}>{r.maxDrawdownPct === null ? "–" : `${r.maxDrawdownPct.toFixed(1)}%`}</td>
                     <td className={TD}>{r.openPosition ?? "None"}</td>

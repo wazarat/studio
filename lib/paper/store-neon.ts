@@ -54,7 +54,7 @@ export function toActivityRow(r: Record<string, unknown>): ActivityRow {
     id: String(r.id),
     strategyId: String(r.strategy_id),
     ownerId: String(r.owner_id),
-    mode: r.mode === "agent" ? "agent" : "paper",
+    mode: r.mode === "agent" ? "agent" : r.mode === "live" ? "live" : "paper",
     kind: r.kind as ActivityRow["kind"],
     positionId: r.position_id ? String(r.position_id) : undefined,
     candleDate: r.candle_date ? dateStr(r.candle_date) : undefined,

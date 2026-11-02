@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { Workspace } from "@/components/studio/Workspace";
 import { getInternalAdminGate, getMarketNames } from "@/lib/auth";
 import { loginPathFor } from "@/lib/auth-paths";
+import { loadLiveView } from "@/lib/live/view";
 import { listConnections } from "@/lib/mcp/connections";
 import { loadPaperForStrategy } from "@/lib/paper/summary";
 import { pendingProposals } from "@/lib/proposals/db";
@@ -27,13 +28,14 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
 
   const bundle = await loadMarkets();
   if (!bundle.markets.some((m) => m.id === row.spec.market.marketId)) notFound();
-  const [candles, paper, names, proposals, connections, saved] = await Promise.all([
+  const [candles, paper, names, proposals, connections, saved, live] = await Promise.all([
     cachedCandles(row.spec.market.marketId).catch(() => null),
     loadPaperForStrategy(row.ownerId, row.id, row.status, row.paperSince, row.blownOutAt),
     getMarketNames(),
     pendingProposals(row.id),
     listConnections(row.ownerId, row.id),
     latestBacktest(row.id),
+    loadLiveView(row).catch(() => null),
   ]);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || "http://localhost:3000";
 
@@ -51,6 +53,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ id: s
       initialConnections={connections.map((c) => ({ clientName: c.clientName, lastSeenAt: c.lastSeenAt, calls: c.calls }))}
       baseUrl={baseUrl}
       savedBacktest={saved?.results ?? null}
+      initialLive={live}
     />
   );
 }

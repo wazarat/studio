@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useTrans
 
 import { candlesAction, listProposalsAction, marketsAction, paperStateAction, saveStrategyAction, setPaperStatusAction } from "@/app/(app)/studio/strategies/actions";
 import { ConnectCard, type ConnectionView } from "@/components/studio/ConnectCard";
+import { GoLiveCard } from "@/components/studio/GoLiveCard";
 import { ProposalCard } from "@/components/studio/ProposalCard";
+import type { LiveView } from "@/lib/live/view";
 import { serverAlias, serverPath } from "@/lib/mcp/connect";
 import type { Proposal } from "@/lib/proposals/types";
 import { PriceChart } from "@/components/charts/dynamic";
@@ -47,6 +49,8 @@ export interface WorkspaceProps {
   initialNames: MarketNames;
   initialProposals: Proposal[];
   initialConnections: ConnectionView[];
+  /** Live trading state (step 7); null on a new, unsaved strategy. */
+  initialLive?: LiveView | null;
   baseUrl: string;
   savedBacktest: BacktestResult | null;
 }
@@ -60,6 +64,8 @@ export function Workspace(props: WorkspaceProps) {
   const [draft, dispatch] = useReducer(draftReducer, props.initialDraft);
   const [savedSpec, setSavedSpec] = useState<StrategySpec | null>(props.savedSpec);
   const [paper, setPaper] = useState<PaperForStrategy | null>(props.initialPaper);
+  const [liveStatus, setLiveStatus] = useState<"live" | "draft">(props.initialLive?.link && ["active", "paused", "closing", "permission-ended"].includes(props.initialLive.link.status) ? "live" : "draft");
+  const onLiveStatus = useCallback((s: "live" | "draft") => setLiveStatus(s), []);
   const [proposals, setProposals] = useState<Proposal[]>(props.initialProposals);
   const [paperNote, setPaperNote] = useState<string | null>(null);
   const [toggling, startToggle] = useTransition();
@@ -374,6 +380,11 @@ export function Workspace(props: WorkspaceProps) {
         </div>
 
         <ResultsTabs result={run.result} error={run.error} startUsd={draft.size.collateralUsd} paper={paper} symbol={market.symbol} />
+        {draft.id && props.initialLive ? (
+          <div className="border-t border-ink-700/40 p-4">
+            <GoLiveCard strategyId={draft.id} initial={props.initialLive} saved={!dirty} onStatus={onLiveStatus} />
+          </div>
+        ) : null}
         {draft.id ? (
           <div className="border-t border-ink-700/40 p-4">
             <ConnectCard baseUrl={props.baseUrl} alias={serverAlias(name, draft.id)} path={serverPath(draft.id)} server={draft.id} initial={props.initialConnections} />
@@ -398,7 +409,7 @@ export function Workspace(props: WorkspaceProps) {
           saveError={saveError}
           saveRefusals={saveRefusals}
           onSave={onSave}
-          paper={{ status: paper?.status ?? draft.status, since: paper?.since ?? null, blownOutAt: paper?.blownOutAt ?? null }}
+          paper={{ status: liveStatus === "live" ? "live" : paper?.status === "live" ? "draft" : (paper?.status ?? draft.status), since: paper?.since ?? null, blownOutAt: paper?.blownOutAt ?? null }}
           onStart={() => togglePaper("paper")}
           onStop={() => togglePaper("draft")}
           toggling={toggling}

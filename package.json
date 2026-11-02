@@ -12,6 +12,7 @@
     "db:setup": "node --env-file=.env.local scripts/db-setup.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1161.0",
     "@clerk/mcp-tools": "^0.8.0",
     "@clerk/nextjs": "^7.9.21",
     "@modelcontextprotocol/server": "^2.4.0",

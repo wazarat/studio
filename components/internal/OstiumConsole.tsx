@@ -570,7 +570,7 @@ export function OstiumConsole({ testnet, builderAddress, toleranceBps, devSigner
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button size="sm" variant="secondary" disabled={ticking} onClick={runTickNow}>
-                {ticking ? "Running…" : "Run tick now"}
+                {ticking ? "Running…" : "Run tick now (paper + live)"}
               </Button>
               {tick ? (
                 <span className="text-xs tabular-nums text-ink-400">

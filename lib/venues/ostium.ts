@@ -10,7 +10,10 @@ import {
   type Position as SdkPosition,
   type PriceTick,
   type BuiltTxRequest,
+  extractOrderIdFromReceipt,
 } from "@ostium/builder-sdk";
+import { createPublicClient, http } from "viem";
+import { arbitrum, arbitrumSepolia } from "viem/chains";
 
 import { maxSizeNowUsd } from "@/lib/risk/check";
 import {
@@ -250,6 +253,7 @@ function toPosition(p: SdkPosition, market: Market | undefined): Position {
     stopLoss: p.slPx && num(p.slPx) > 0 ? num(p.slPx) : undefined,
     openedAt: p.openTimestamp,
     isDayTrade: p.isDayTrade,
+    pid: p.pid ? String(p.pid) : undefined,
   };
 }
 
@@ -413,74 +417,86 @@ async function currentMid(marketId: string): Promise<number> {
   return price.mid;
 }
 
-async function buildOpen(trader: Hex, intent: OpenIntent): Promise<UnsignedTx> {
-  await assertOpen(intent.marketId);
-  const price = intent.orderType === "market" ? await currentMid(intent.marketId) : intent.limitPrice;
-  if (!price || price <= 0) throw new VenueError("sdk", "A limit or stop order needs a limit price");
-  const client = await buildClient(trader);
-  const built = await wrapSdk(async () =>
-    client.getOpenTradeTx({
-      pairId: intent.marketId,
-      buy: intent.side === "long",
-      price: toDec(price),
-      collateral: toDec(intent.collateralUsd, 6),
-      leverage: toDec(intent.leverage, 2),
-      type: sdkOrderType(intent.orderType),
-      takeProfit: intent.takeProfit ? toDec(intent.takeProfit) : undefined,
-      stopLoss: intent.stopLoss ? toDec(intent.stopLoss) : undefined,
-      slippage: intent.slippageBps,
-      isDayTrade: intent.isDayTrade,
-      builder: builderConfig(),
-    }),
-  );
-  return toUnsignedTx(built);
+/**
+ * The three transaction builders over any client factory: the self client
+ * (the trader signs) or, in step 7, a delegated client whose calldata is
+ * wrapped in `delegatedAction` and whose `from` is the session account.
+ */
+function makeBuilders(clientFor: (trader: Hex) => Promise<OstiumClient>) {
+  async function buildOpen(trader: Hex, intent: OpenIntent): Promise<UnsignedTx> {
+    await assertOpen(intent.marketId);
+    const price = intent.orderType === "market" ? await currentMid(intent.marketId) : intent.limitPrice;
+    if (!price || price <= 0) throw new VenueError("sdk", "A limit or stop order needs a limit price");
+    const client = await clientFor(trader);
+    const built = await wrapSdk(async () =>
+      client.getOpenTradeTx({
+        pairId: intent.marketId,
+        buy: intent.side === "long",
+        price: toDec(price),
+        collateral: toDec(intent.collateralUsd, 6),
+        leverage: toDec(intent.leverage, 2),
+        type: sdkOrderType(intent.orderType),
+        takeProfit: intent.takeProfit ? toDec(intent.takeProfit) : undefined,
+        stopLoss: intent.stopLoss ? toDec(intent.stopLoss) : undefined,
+        slippage: intent.slippageBps,
+        isDayTrade: intent.isDayTrade,
+        builder: builderConfig(),
+      }),
+    );
+    return toUnsignedTx(built);
+  }
+
+  async function buildClose(trader: Hex, intent: CloseIntent): Promise<UnsignedTx> {
+    await assertOpen(intent.marketId);
+    const price = await currentMid(intent.marketId);
+    const client = await clientFor(trader);
+    const built = await wrapSdk(async () =>
+      client.getCloseTradeTx({
+        pairId: intent.marketId,
+        idx: intent.index,
+        price: toDec(price),
+        closePercent: Math.min(100, Math.max(1, Math.round(intent.closePercent))),
+      }),
+    );
+    return toUnsignedTx(built);
+  }
+
+  async function buildUpdate(trader: Hex, intent: UpdateIntent): Promise<UnsignedTx[]> {
+    await assertOpen(intent.marketId);
+    const client = await clientFor(trader);
+    const out: UnsignedTx[] = [];
+    // Ostium sets a position's take profit and stop loss in separate calls.
+    if (intent.takeProfit !== undefined) {
+      const takeProfit = toDec(intent.takeProfit ?? 0);
+      const built = await wrapSdk(async () =>
+        client.getModifyOrderTx({ pairId: intent.marketId, idx: intent.index, target: "position", takeProfit }),
+      );
+      out.push(toUnsignedTx(built));
+    }
+    if (intent.stopLoss !== undefined) {
+      const stopLoss = toDec(intent.stopLoss ?? 0);
+      const built = await wrapSdk(async () =>
+        client.getModifyOrderTx({ pairId: intent.marketId, idx: intent.index, target: "position", stopLoss }),
+      );
+      out.push(toUnsignedTx(built));
+    }
+    if (intent.collateralDeltaUsd !== undefined && intent.collateralDeltaUsd !== 0) {
+      const delta = intent.collateralDeltaUsd;
+      const amount = delta > 0 ? `+${toDec(delta, 6)}` : toDec(delta, 6);
+      const built = await wrapSdk(() =>
+        client.getUpdateCollateralTx({ pairId: intent.marketId, idx: intent.index, amount }),
+      );
+      out.push(toUnsignedTx(built));
+    }
+    if (out.length === 0) throw new VenueError("sdk", "Nothing to update: give a take profit, stop loss or collateral change");
+    return out;
+  }
+
+  return { buildOpen, buildClose, buildUpdate };
 }
 
-async function buildClose(trader: Hex, intent: CloseIntent): Promise<UnsignedTx> {
-  await assertOpen(intent.marketId);
-  const price = await currentMid(intent.marketId);
-  const client = await buildClient(trader);
-  const built = await wrapSdk(async () =>
-    client.getCloseTradeTx({
-      pairId: intent.marketId,
-      idx: intent.index,
-      price: toDec(price),
-      closePercent: Math.min(100, Math.max(1, Math.round(intent.closePercent))),
-    }),
-  );
-  return toUnsignedTx(built);
-}
-
-async function buildUpdate(trader: Hex, intent: UpdateIntent): Promise<UnsignedTx[]> {
-  await assertOpen(intent.marketId);
-  const client = await buildClient(trader);
-  const out: UnsignedTx[] = [];
-  // Ostium sets a position's take profit and stop loss in separate calls.
-  if (intent.takeProfit !== undefined) {
-    const takeProfit = toDec(intent.takeProfit ?? 0);
-    const built = await wrapSdk(async () =>
-      client.getModifyOrderTx({ pairId: intent.marketId, idx: intent.index, target: "position", takeProfit }),
-    );
-    out.push(toUnsignedTx(built));
-  }
-  if (intent.stopLoss !== undefined) {
-    const stopLoss = toDec(intent.stopLoss ?? 0);
-    const built = await wrapSdk(async () =>
-      client.getModifyOrderTx({ pairId: intent.marketId, idx: intent.index, target: "position", stopLoss }),
-    );
-    out.push(toUnsignedTx(built));
-  }
-  if (intent.collateralDeltaUsd !== undefined && intent.collateralDeltaUsd !== 0) {
-    const delta = intent.collateralDeltaUsd;
-    const amount = delta > 0 ? `+${toDec(delta, 6)}` : toDec(delta, 6);
-    const built = await wrapSdk(() =>
-      client.getUpdateCollateralTx({ pairId: intent.marketId, idx: intent.index, amount }),
-    );
-    out.push(toUnsignedTx(built));
-  }
-  if (out.length === 0) throw new VenueError("sdk", "Nothing to update: give a take profit, stop loss or collateral change");
-  return out;
-}
+const selfBuilders = makeBuilders(buildClient);
+const { buildOpen, buildClose, buildUpdate } = selfBuilders;
 
 export const ostium: Venue = {
   id: "ostium",
@@ -510,6 +526,10 @@ export interface FillRow {
   closedPnlUsd: number;
   fees: { opening: number; rollover: number; builder: number; oracle: number; priceImpact: number };
   hash: string;
+  /** Ostium's order id; the receipt of the sent transaction carries the same one. */
+  oid?: string;
+  /** Position id, shared by the open and every later action on it. */
+  pid?: string;
   /** ms epoch. */
   at: number;
 }
@@ -534,6 +554,8 @@ function toFillRow(f: Fill, byId: Map<string, Market>): FillRow {
       priceImpact: num(f.fees?.priceImpact),
     },
     hash: f.hash,
+    oid: f.oid ? String(f.oid) : undefined,
+    pid: f.pid ? String(f.pid) : undefined,
     at: f.timestamp > 1e12 ? f.timestamp : f.timestamp * 1000,
   };
 }
@@ -629,4 +651,122 @@ export async function getPriceChanges24h(): Promise<Map<string, number>> {
   } catch {
     return changesCache?.byId ?? new Map();
   }
+}
+
+/* ---------- Step 7: delegated trading through the user's wallet ---------- */
+
+/**
+ * Build-only client for Ostium's delegated-self mode: the trader keeps the
+ * USDC and the positions, the session account (the delegate) signs and
+ * pays gas. Every trade it builds is wrapped in `delegatedAction`.
+ */
+function delegatedClient(trader: Hex, delegate: Hex): Promise<OstiumClient> {
+  return OstiumClient.createDelegatedAndSelf({
+    traderAddress: trader,
+    delegateAddress: delegate,
+    testnet: isTestnet(),
+    rpcUrl: rpcUrl(),
+    slippageBps: DEFAULT_SLIPPAGE_BPS,
+    builder: builderConfig(),
+  });
+}
+
+export type DelegatedVenue = Pick<Venue, "buildOpen" | "buildClose" | "buildUpdate">;
+
+/** The venue's builders for one trader through one delegate; the `Venue` interface itself is unchanged. */
+export function delegatedVenue(trader: Hex, delegate: Hex): DelegatedVenue {
+  const b = makeBuilders(() => delegatedClient(trader, delegate));
+  return {
+    buildOpen: (t, intent) => b.buildOpen(t, intent),
+    buildClose: (t, intent) => b.buildClose(t, intent),
+    buildUpdate: (t, intent) => b.buildUpdate(t, intent),
+  };
+}
+
+/** The trader registers the session account as their delegate; signed by the trader's own wallet. */
+export async function getSetDelegateTx(trader: Hex, delegate: Hex): Promise<UnsignedTx> {
+  const client = await buildClient(trader);
+  const built = await wrapSdk(async () => client.getSetDelegateTx(delegate, { from: "trader" }));
+  return toUnsignedTx(built);
+}
+
+/** The trader removes their delegate; signed by the trader's own wallet. Ends the bot for good. */
+export async function getRemoveDelegateTx(trader: Hex): Promise<UnsignedTx> {
+  const client = await buildClient(trader);
+  const built = await wrapSdk(async () => client.getRemoveDelegateTx({ from: "trader" }));
+  return toUnsignedTx(built);
+}
+
+export interface DelegationStatus {
+  /** True when the delegate is registered and the allowance and balance cover `requiredUsd`. */
+  ready: boolean;
+  allowanceUsd: number;
+  usdcUsd: number;
+  ethBalance: number;
+  /** The delegate registered on-chain, if any. */
+  currentDelegate?: Hex;
+  delegateMatches: boolean;
+}
+
+/** What stands between the trader and a delegated trade: approval, balance, and whether our session is the delegate. */
+export async function getDelegationStatus(trader: Hex, delegate: Hex, requiredUsd = 1): Promise<DelegationStatus> {
+  const client = await delegatedClient(trader, delegate);
+  const st = await wrapSdk(() => client.getOnboardingStatus({ requiredUsd: toDec(requiredUsd, 6) }));
+  const current = st.currentDelegate ? (st.currentDelegate as Hex) : undefined;
+  return {
+    ready: st.ready,
+    allowanceUsd: num(st.allowance),
+    usdcUsd: num(st.usdcBalance),
+    ethBalance: num(st.ethBalance),
+    currentDelegate: current,
+    delegateMatches: !!current && current.toLowerCase() === delegate.toLowerCase(),
+  };
+}
+
+/** Executed fills for the trader since `fromMs`, newest first. */
+export async function getFillsSince(trader: Hex, fromMs: number, limit = 200): Promise<FillRow[]> {
+  const [client, cache] = await Promise.all([traderClient(), pairs()]);
+  const fills = await wrapSdk(() => client.getFillsByTime({ user: trader, startTime: fromMs, limit }));
+  return fills.map((f) => toFillRow(f, cache.byId)).sort((a, b) => b.at - a.at);
+}
+
+function tradingPublicClient() {
+  return createPublicClient({ chain: isTestnet() ? arbitrumSepolia : arbitrum, transport: http(rpcUrl()) });
+}
+
+/**
+ * Ostium's order id from a sent transaction's receipt, or null when the
+ * receipt is not in yet. The keeper's fill carries the same id, so this is
+ * how an order of ours is matched to its fill.
+ */
+export async function orderIdFromReceipt(hash: Hex, trader: Hex, action: "open" | "close"): Promise<string | null> {
+  const receipt = await tradingPublicClient()
+    .getTransactionReceipt({ hash })
+    .catch(() => null);
+  if (!receipt) return null;
+  if (receipt.status !== "success") throw new VenueError("sdk", `Transaction ${hash} reverted`);
+  return extractOrderIdFromReceipt(receipt, trader, action) ?? null;
+}
+
+/** The trading contract's revert when the sender is no longer the trader's delegate. */
+export function isNotDelegateError(e: unknown): boolean {
+  const msg = e instanceof Error ? `${e.message} ${(e as { cause?: { message?: string } }).cause?.message ?? ""}` : String(e);
+  return /NotDelegate|not the delegate|NoDelegate|DelegateForbidden/i.test(msg);
+}
+
+/** The USDC and trading contracts a delegate may reach, for the terms screen. */
+export function tradingContracts(): { trading: Hex; tradingStorage: Hex; usdc: Hex; network: string } {
+  return isTestnet()
+    ? {
+        trading: "0x2A9B9c988393f46a2537B0ff11E98c2C15a95afe",
+        tradingStorage: "0x0b9F5243B29938668c9Cfbd7557A389EC7Ef88b8",
+        usdc: "0xe73B11Fb1e3eeEe8AF2a23079A4410Fe1B370548",
+        network: "Arbitrum Sepolia",
+      }
+    : {
+        trading: "0x6D0bA1f9996DBD8885827e1b2e8f6593e7702411",
+        tradingStorage: "0xcCd5891083A8acD2074690F65d3024E7D13d66E7",
+        usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        network: "Arbitrum One",
+      };
 }

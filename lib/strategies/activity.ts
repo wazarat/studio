@@ -13,7 +13,7 @@ export interface ActivityEvent {
   kind: "entry" | "exit" | "refused" | "signal" | "skip" | "proposal";
   time: number;
   text: string;
-  source: "backtest" | "paper" | "agent";
+  source: "backtest" | "paper" | "agent" | "live";
 }
 
 interface StrategyLike {

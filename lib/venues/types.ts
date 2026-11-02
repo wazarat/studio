@@ -102,6 +102,8 @@ export interface Position {
   /** ms epoch. */
   openedAt: number;
   isDayTrade: boolean;
+  /** The venue's position id, shared with every fill on this position (step 7). */
+  pid?: string;
 }
 
 export interface OpenIntent {

@@ -126,6 +126,39 @@ through the checker and testnet test trades. `OSTIUM_TESTNET=true` by default.
   or link per client (Claude Code, Claude, Cursor, VS Code, Codex, ChatGPT)
   and shows who is connected.
 
+## Step 7: live trading through wallet permissions (testnet only)
+
+- Step 0 found that MetaMask's ERC-7715 permissions are token-spend only
+  (ERC-20 and native allowance, periodic and stream; MetaMask 13.23.0+,
+  Arbitrum Sepolia supported), so they cannot scope Ostium calls or keep
+  positions in the user's account. Live trading uses Ostium's own
+  delegation instead: the wallet approves exactly the agreed USDC total to
+  Trading Storage and registers a per-wallet session account as its
+  delegate; the session trades through `delegatedAction`, so positions and
+  USDC stay in the wallet and closes pay the wallet. Revoking in MetaMask
+  (remove delegate, or approval to 0) stops every strategy on that wallet.
+- Session keys are secp256k1 keys in AWS KMS (`AWS_REGION`,
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`); signing happens inside KMS
+  and nothing in Studio ever holds or returns a key. One session per wallet
+  serves every live strategy on it; the key is disabled and scheduled for
+  deletion when the last one stops. Gas is a small Sepolia ETH top-up from
+  the dev wallet (`LIVE_GAS_TOPUP_ETH`); Ostium's sponsored path needs a
+  Safe delegate and their builder API, so there is no paymaster in this mode.
+- The Go-live card on a strategy page: connect the wallet, read the terms
+  (trade size and leverage, daily stop, total approval shown as trades,
+  expiry, the contracts allowed), confirm two MetaMask transactions. Live
+  strategies ride the paper tick: the checker runs again right before each
+  order is built (now counting the wallet's exposure in that market for the
+  open-interest share), take profit and stop loss go on the Ostium trade
+  itself, every order is recorded before it is sent and matched to its fill
+  by order id, and positions are read from the chain, never stored.
+- Controls: Pause (no entries, positions stay), Close all (works while
+  paused), Stop (close, end, destroy the key when the wallet has no other
+  live strategy), Revoke in MetaMask. A revoked or expired permission marks
+  the strategy "permission ended" with one row in the feed and nothing more
+  is sent. Live mode refuses to run unless `OSTIUM_TESTNET=true` and KMS is
+  configured; MCP tools are unchanged.
+
 ## Run
 
 ```bash

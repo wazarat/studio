@@ -173,6 +173,82 @@ await sql`alter table studio.activity add constraint activity_mode_check check (
 await sql`alter table studio.activity drop constraint if exists activity_kind_check`;
 await sql`alter table studio.activity add constraint activity_kind_check check (kind in ('signal', 'fill', 'refusal', 'close', 'skip', 'proposal'))`;
 
+// Step 7: live trading through Ostium delegation (testnet only). One session
+// key per wallet, a link per strategy, and every order the session sent.
+await sql`
+  create table if not exists studio.wallet_sessions (
+    id uuid primary key default gen_random_uuid(),
+    owner_id text not null,
+    trader_address text not null,
+    session_address text not null,
+    kms_key_id text not null,
+    status text not null default 'pending' check (status in ('pending', 'active', 'permission-ended', 'ended')),
+    expires_at timestamptz,
+    approve_tx text,
+    delegate_tx text,
+    gas_topup_tx text,
+    last_delegate_check timestamptz,
+    allowance_usd numeric not null default 0,
+    created_at timestamptz not null default now(),
+    activated_at timestamptz,
+    ended_at timestamptz,
+    ended_reason text
+  )`;
+await sql`create unique index if not exists wallet_sessions_open_idx on studio.wallet_sessions (owner_id, lower(trader_address))
+  where status in ('pending', 'active', 'permission-ended')`;
+
+await sql`
+  create table if not exists studio.live_strategies (
+    strategy_id uuid primary key references studio.strategies(id) on delete cascade,
+    session_id uuid not null references studio.wallet_sessions(id) on delete cascade,
+    owner_id text not null,
+    status text not null default 'active' check (status in ('active', 'paused', 'closing', 'permission-ended', 'ended')),
+    total_cap_usd numeric not null,
+    spent_usd numeric not null default 0,
+    started_at timestamptz not null default now(),
+    ended_at timestamptz,
+    ended_reason text
+  )`;
+await sql`create index if not exists live_strategies_session_idx on studio.live_strategies (session_id)`;
+
+await sql`
+  create table if not exists studio.live_orders (
+    id uuid primary key default gen_random_uuid(),
+    strategy_id uuid not null references studio.strategies(id) on delete cascade,
+    session_id uuid not null references studio.wallet_sessions(id) on delete cascade,
+    owner_id text not null,
+    kind text not null check (kind in ('open', 'close')),
+    ref text not null,
+    market_id text not null,
+    symbol text not null,
+    candle_date date,
+    collateral_usd numeric,
+    leverage numeric,
+    take_profit numeric,
+    stop_loss numeric,
+    tx_hash text,
+    oid text,
+    pid text,
+    position_index integer,
+    status text not null default 'building' check (status in ('building', 'submitted', 'filled', 'cancelled', 'failed')),
+    fill_price numeric,
+    fill_pnl_usd numeric,
+    fill_fees_usd numeric,
+    closed_at timestamptz,
+    close_reason text,
+    close_pnl_usd numeric,
+    error text,
+    reason text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique (strategy_id, kind, ref)
+  )`;
+await sql`create index if not exists live_orders_strategy_idx on studio.live_orders (strategy_id, created_at desc)`;
+await sql`create index if not exists live_orders_pending_idx on studio.live_orders (session_id) where status in ('building', 'submitted')`;
+
+await sql`alter table studio.activity drop constraint if exists activity_mode_check`;
+await sql`alter table studio.activity add constraint activity_mode_check check (mode in ('backtest', 'paper', 'agent', 'live'))`;
+
 const tables = await sql`
   select table_name from information_schema.tables
   where table_schema = 'studio' order by table_name`;

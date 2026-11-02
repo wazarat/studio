@@ -1,5 +1,6 @@
 import "server-only";
 
+import { liveLinksForOwner } from "@/lib/live/store-neon";
 import { listConnections, type McpConnection } from "@/lib/mcp/connections";
 import { mergeActivity, paperEvent } from "@/lib/paper/activity";
 import { paperActivityFor } from "@/lib/paper/store-neon";
@@ -19,7 +20,7 @@ export interface StrategyRowView {
   name: string;
   symbol: string;
   rule: string;
-  status: "backtest" | "paper" | "live" | "blown out";
+  status: "backtest" | "paper" | "live" | "blown out" | "permission ended";
   returnPct: number | null;
   maxDrawdownPct: number | null;
   /** "Long since 12 Oct 2026" or null. */
@@ -53,7 +54,14 @@ export async function loadDashboard(userId: string | null, admin: boolean, names
   const storage = storageConfigured();
   if (!admin || !userId || !storage) return { ...bundle, rows: [], activity: [], nextCheckAt, storage, paper: null, connections: [] };
 
-  const [strategies, paper, paperRows, connections] = await Promise.all([listStrategies(userId), loadPaperSummary(userId, bundle.prices), paperActivityFor(userId, null, 50), listConnections(userId, "account")]);
+  const [strategies, paper, paperRows, connections, liveLinks] = await Promise.all([
+    listStrategies(userId),
+    loadPaperSummary(userId, bundle.prices),
+    paperActivityFor(userId, null, 50),
+    listConnections(userId, "account"),
+    liveLinksForOwner(userId).catch(() => []),
+  ]);
+  const liveById = new Map(liveLinks.map((l) => [l.link.strategyId, l.link]));
   const backtests = await latestBacktests(strategies.map((s) => s.id));
   const results = new Map(Array.from(backtests, ([id, b]) => [id, b.results]));
   const byId = new Map(strategies.map((s) => [s.id, s]));
@@ -71,7 +79,14 @@ export async function loadDashboard(userId: string | null, admin: boolean, names
       name: s.name,
       symbol: s.symbol,
       rule: describeEntry(s.spec.entry),
-      status: s.blownOutAt ? "blown out" : s.status === "draft" ? "backtest" : s.status,
+      status:
+        s.status === "live" && liveById.get(s.id)?.status === "permission-ended"
+          ? "permission ended"
+          : s.blownOutAt && s.status !== "live"
+            ? "blown out"
+            : s.status === "draft"
+              ? "backtest"
+              : s.status,
       // Stored results from before the blow-out stop can exceed −100%; the floor applies on display too.
       returnPct: r ? Math.max(-100, r.strategy.returnPct) : null,
       maxDrawdownPct: r ? Math.min(100, r.strategy.maxDrawdownPct) : null,

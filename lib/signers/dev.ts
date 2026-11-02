@@ -4,8 +4,8 @@ import { createWalletClient, http, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
 
+import type { Signer } from "@/lib/signers/types";
 import { ARBITRUM_SEPOLIA_CHAIN_ID, isTestnet } from "@/lib/venues/ostium";
-import type { UnsignedTx } from "@/lib/venues/types";
 
 /**
  * The test-only signer (Studio step 3): a testnet key from .env.local that
@@ -15,10 +15,7 @@ import type { UnsignedTx } from "@/lib/venues/types";
  * signs anything.
  */
 
-export interface DevSigner {
-  address: Hex;
-  send(tx: UnsignedTx): Promise<{ hash: Hex }>;
-}
+export type DevSigner = Signer;
 
 let cached: DevSigner | null | undefined;
 

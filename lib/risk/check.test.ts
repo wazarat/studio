@@ -217,4 +217,15 @@ describe("checkRisk", () => {
     const input = open({ sizeUsd: 1_500, limits: { maxPositionUsdPerStrategy: 2_000, maxOiShareBps: 200 } });
     expect(codes(input)).toEqual([]);
   });
+  it("counts the wallet's other positions in the market against the open-interest share (step 7)", () => {
+    // 1% of the $100,000 left on the long side is $1,000: $600 alone passes, $600 on top of $500 already open does not.
+    const base = open({ sizeUsd: 600 });
+    expect(checkRisk(base).refusals.map((f) => f.code)).not.toContain("size-over-oi-share");
+    const withWallet = checkRisk({ ...base, walletOpenInMarketUsd: 500 });
+    expect(withWallet.refusals.map((f) => f.code)).toContain("size-over-oi-share");
+    expect(withWallet.refusals.find((f) => f.code === "size-over-oi-share")?.actual).toBe(1_100);
+    // The per-strategy cap still only sees the strategy's own notional.
+    expect(withWallet.refusals.map((f) => f.code)).not.toContain("size-over-strategy-cap");
+  });
+
 });

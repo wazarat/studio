@@ -44,7 +44,7 @@ export function paperEvent(row: ActivityRow, strategyName: string, symbol: strin
       text = row.reason;
       break;
   }
-  return { id: row.id, strategyId: row.strategyId, strategyName, kind, time: row.time, text, source: row.mode === "agent" ? "agent" : "paper" };
+  return { id: row.id, strategyId: row.strategyId, strategyName, kind, time: row.time, text, source: row.mode === "agent" ? "agent" : row.mode === "live" ? "live" : "paper" };
 }
 
 export function mergeActivity(a: ActivityEvent[], b: ActivityEvent[], cap = 50): ActivityEvent[] {

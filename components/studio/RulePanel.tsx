@@ -73,6 +73,7 @@ export function RulePanel(p: RulePanelProps) {
       .join(" ") || undefined;
   const blocking = refusals.some((f) => refusalSlot(f.code) !== "market" && refusalSlot(f.code) !== "note");
   const onPaper = p.paper.status === "paper";
+  const onLive = p.paper.status === "live";
   const canSave = p.dirty && Object.keys(issues).length === 0 && !blocking && !p.saving && !onPaper;
   const canStart = Boolean(draft.id) && !p.dirty && Object.keys(issues).length === 0 && !blocking && p.paper.status === "draft" && !p.toggling;
   const entry = draft.entry;
@@ -222,7 +223,11 @@ export function RulePanel(p: RulePanelProps) {
       <div className="mt-auto space-y-2 border-t border-ink-700/40 p-4">
         {p.saveError ? <p className="text-xs text-rose-400">{p.saveError}</p> : null}
         {p.paperNote ? <p className="text-xs text-ink-300">{p.paperNote}</p> : null}
-        {onPaper ? (
+        {onLive ? (
+          <Button type="button" variant="secondary" className="w-full" disabled>
+            Live · stop live trading to edit
+          </Button>
+        ) : onPaper ? (
           <Button type="button" variant="secondary" className="w-full" disabled={p.toggling} onClick={p.onStop}>
             {p.toggling ? "Stopping…" : "Stop paper trading"}
           </Button>
@@ -239,6 +244,8 @@ export function RulePanel(p: RulePanelProps) {
         <p className="text-center text-[11px] text-ink-500">
           {p.paper.blownOutAt
             ? `Blown out on ${new Date(p.paper.blownOutAt).toISOString().slice(0, 10)}: equity fell below Ostium's $5 minimum. Save a change and start again.`
+            : onLive
+            ? "Live on Arbitrum Sepolia through your wallet · controls are in the Live trading card"
             : onPaper
             ? `Paper since ${p.paper.since ? new Date(p.paper.since).toISOString().slice(0, 10) : "today"} · stop to edit`
             : p.dirty
